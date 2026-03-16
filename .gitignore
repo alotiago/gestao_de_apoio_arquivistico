@@ -62,6 +62,7 @@ minio_data/
 # ---- Misc ----
 *.bak
 *.tmp
+backend/celerybeat-schedule
 
 # ---- E2E (Playwright) ----
 playwright-report/
