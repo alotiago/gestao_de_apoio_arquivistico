@@ -1,0 +1,35 @@
+[project]
+name = "gestao-apoio-arquivistico"
+version = "0.1.0"
+description = "Sistema de Gestão de Apoio Arquivístico — Backend API"
+requires-python = ">=3.12"
+authors = [{ name = "HW1 Team" }]
+license = { text = "Proprietary" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-v --tb=short"
+
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+select = ["E", "F", "I", "N", "W", "UP", "B", "SIM"]
+
+[tool.ruff.isort]
+known-first-party = ["app"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy", "sqlalchemy.ext.mypy.plugin"]
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["tests/*", "alembic/*"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true

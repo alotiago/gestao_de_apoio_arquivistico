@@ -1,0 +1,71 @@
+# ===========================================================
+# .gitignore — Gestão de Apoio Arquivístico
+# ===========================================================
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+
+# ---- Virtual Environment ----
+.venv/
+venv/
+ENV/
+
+# ---- Node.js ----
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+
+# ---- Environment ----
+.env
+.env.local
+.env.*.local
+
+# ---- IDE ----
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- Docker ----
+*.log
+
+# ---- MinIO local data ----
+minio_data/
+
+# ---- Alembic ----
+# Don't ignore versions — they are source-controlled
+# alembic/versions/
+
+# ---- Misc ----
+*.bak
+*.tmp
+
+# ---- E2E (Playwright) ----
+playwright-report/
+test-results/
+
+# ---- Non-functional tests ----
+backend/tests/nonfunctional/reports/

@@ -1,0 +1,37 @@
+Work Item Type,Title,Description,Acceptance Criteria,State,Tags,Iteration Path,Area Path,Story Points,Parent
+Epic,EP1 - Entrevistas Assistidas,Descobrir séries/risco/base legal via roteiros dinâmicos com evidências.,,New,Entrevista;MVP,Projeto\MVP,Projeto,,
+User Story,US-001 - Roteiros dinâmicos,Como Arquivista quero cadastrar e versionar roteiros por área/processo com lógica condicional para identificar séries/metadados/base legal.,Valida branching e versionamento com justificativa,New,Entrevista;PCD;LGPD;MVP,Projeto\MVP,Projeto,8,EP1 - Entrevistas Assistidas
+User Story,US-002 - Motor condicional,Como Entrevistador quero navegar por perguntas com validações e branching para otimizar entrevistas.,Erros em obrigatórios; bloco de Eventos por tipo,New,Entrevista;MVP,Projeto\MVP,Projeto,5,EP1 - Entrevistas Assistidas
+User Story,US-003 - Evidências e anexos,Como Entrevistador quero anexar evidências para sustentar decisões.,Hash+antivírus; vínculo à resposta,New,Entrevista;Auditoria;MVP,Projeto\MVP,Projeto,5,EP1 - Entrevistas Assistidas
+User Story,US-004 - Mapeamento p/ classes,Como Arquivista quero sugestões automáticas de classe/metadados a partir das respostas.,Sugestão de classe com justificativa,New,PCD;Entrevista;MVP,Projeto\MVP,Projeto,8,EP1 - Entrevistas Assistidas
+Epic,EP2 - Construtor de PCD,Modelar função→atividade→série→classe com versionamento e aprovação.,,New,PCD;MVP,Projeto\MVP,Projeto,,
+User Story,US-010 - Modelagem hierárquica,Como Arquivista quero modelar Função>Atividade>Série>Classe.,CRUD; unicidade; exemplos por classe,New,PCD;MVP,Projeto\MVP,Projeto,8,EP2 - Construtor de PCD
+User Story,US-011 - Versionamento PCD,Como Gestor quero aprovar versões do PCD.,Aprovação com justificativa e registro de aprovador,New,PCD;Governanca;MVP,Projeto\MVP,Projeto,5,EP2 - Construtor de PCD
+User Story,US-012 - Metadados de controle,Como Segurança quero perfis de metadados de sigilo/controle.,Metadados mínimos definidos,New,PCD;Seguranca;LGPD;MVP,Projeto\MVP,Projeto,5,EP2 - Construtor de PCD
+Epic,EP3 - Construtor de TTD,"Regras de retenção, eventos, exceções e destinação com termos.",,New,TTD;MVP,Projeto\MVP,Projeto,,
+User Story,US-020 - Regras + eventos,Como Arquivista quero cadastrar regras de retenção com eventos de início.,Datas relativas; exceções,New,TTD;MVP;LGPD,Projeto\MVP,Projeto,8,EP3 - Construtor de TTD
+User Story,US-021 - Exceções/holds,Como Jurídico quero aplicar legal hold e detectar conflitos.,Relatório de conflitos; justificativa,New,TTD;Juridico;MVP,Projeto\MVP,Projeto,5,EP3 - Construtor de TTD
+User Story,US-022 - Ordens/termos,Como Gestor quero gerar ordens com termos assinados.,Export PDF/CSV; assinatura digital; hash,New,TTD;Auditoria;MVP,Projeto\MVP,Projeto,5,EP3 - Construtor de TTD
+Epic,EP4 - Execução do Ciclo de Vida,"Motor de retenção, avaliação e ordens.",,New,Retencao;MVP,Projeto\MVP,Projeto,,
+User Story,US-030 - Motor de retenção,Como Admin quero agendar janelas e logs imutáveis.,Idempotência; relatório de sucesso/falha,New,Retencao;Auditoria;MVP,Projeto\MVP,Projeto,8,EP4 - Execução do Ciclo de Vida
+User Story,US-031 - Workflows avaliação,Como Arquivista quero avaliação 4-olhos com SLA.,Estados fluxo; notificações,New,Retencao;Workflow;MVP,Projeto\MVP,Projeto,5,EP4 - Execução do Ciclo de Vida
+User Story,US-032 - Selo de evidência,Como Compliance quero selo (hash+timestamp+usuário+razão).,Pacote de auditoria exportável,New,Auditoria;MVP,Projeto\MVP,Projeto,5,EP4 - Execução do Ciclo de Vida
+Epic,EP5 - Governança & Auditoria,Matriz de rastreabilidade e logs imutáveis.,,New,Governanca;Auditoria;MVP,Projeto\MVP,Projeto,,
+User Story,US-040 - Matriz rastreabilidade,Como Compliance quero Classe↔Regra↔Base Legal↔Risco↔Evidência.,Drill-down e filtros,New,Governanca;LGPD;MVP,Projeto\MVP,Projeto,5,EP5 - Governança & Auditoria
+User Story,US-041 - Logs WORM/hashchain,Como Auditor quero logs à prova de adulteração.,Verificação de integridade e alerta,New,Auditoria;WORM;MVP,Projeto\MVP,Projeto,5,EP5 - Governança & Auditoria
+Epic,EP6 - Integração & Interoperabilidade,"APIs, webhooks e conectores (Docz/Eternal/ECM/IDM).",,New,Integracao;MVP,Projeto\MVP,Projeto,,
+User Story,US-050 - APIs REST/GraphQL,Como Dev Integrador quero CRUD via APIs.,OpenAPI; OAuth2/OIDC; paginação,New,Integracao;API;MVP,Projeto\MVP,Projeto,8,EP6 - Integração & Interoperabilidade
+User Story,US-051 - Webhooks,Como Sistema Externo quero eventos de ciclo de vida.,Eventos principais definidos,New,Integracao;Eventos;MVP,Projeto\MVP,Projeto,3,EP6 - Integração & Interoperabilidade
+User Story,US-052 - Conectores ECM/Docz/Eternal,Como Operação quero aplicar políticas em repositórios externos.,Mapeamento e import; relatórios de erro,New,Integracao;Docz;Eternal;ECM;MVP,Projeto\MVP,Projeto,8,EP6 - Integração & Interoperabilidade
+Epic,EP7 - Segurança & Privacidade (LGPD),"RBAC/ABAC, criptografia, legal hold e sigilo.",,New,Seguranca;LGPD;MVP,Projeto\MVP,Projeto,,
+User Story,US-060 - RBAC/ABAC,Como Admin quero papéis e políticas por atributos.,Segregação de funções; relatórios de acesso,New,Seguranca;Acesso;MVP,Projeto\MVP,Projeto,8,EP7 - Segurança & Privacidade (LGPD)
+User Story,US-061 - LGPD & Criptografia,Como DPO quero marcar dados pessoais/sensíveis e criptografar.,Anonimização/pseudonimização,New,LGPD;Criptografia;MVP,Projeto\MVP,Projeto,5,EP7 - Segurança & Privacidade (LGPD)
+Epic,EP8 - Observabilidade & Operação,"Métricas, SLOs, HA/DR e backup.",,New,Operacao;Observabilidade;BETA,Projeto\BETA,Projeto,,
+User Story,US-070 - Telemetria/SLOs,Como SRE quero métricas/alertas e SLOs.,Dashboards; tracing; alertas,New,Observabilidade;BETA,Projeto\BETA,Projeto,5,EP8 - Observabilidade & Operação
+User Story,US-071 - HA/DR/Backup,Como Operação quero RPO/RTO e restauração granular.,Testes periódicos,New,Operacao;DR;BETA,Projeto\BETA,Projeto,5,EP8 - Observabilidade & Operação
+Epic,EP9 - Dados & Migração,"Inventário, qualidade e estratégia.",,New,Dados;Migracao;BETA,Projeto\BETA,Projeto,,
+User Story,US-080 - Inventário/Qualidade,Como Arquivista quero inventário e score de qualidade.,Relatórios de completude/duplicidade,New,Dados;BETA,Projeto\BETA,Projeto,5,EP9 - Dados & Migração
+User Story,US-081 - Corte/Enriquecimento,Como Gestor de Projeto quero ondas e enriquecimento.,Logs de mudanças,New,Dados;BETA,Projeto\BETA,Projeto,5,EP9 - Dados & Migração
+Epic,EP10 - UX & Adoção,"Assistente, acessibilidade e base de conhecimento.",,New,UX;Adocao;GA,Projeto\GA,Projeto,,
+User Story,US-090 - Assistente de entrevista,Como Entrevistador quero prévia PCD/TTD e progresso.,WCAG 2.1 AA; validações contextuais,New,UX;GA,Projeto\GA,Projeto,3,EP10 - UX & Adoção
+User Story,US-091 - Treinamento/Knowledge,Como Gestor quero trilhas e templates.,FAQ e ajuda contextual,New,Adocao;GA,Projeto\GA,Projeto,3,EP10 - UX & Adoção

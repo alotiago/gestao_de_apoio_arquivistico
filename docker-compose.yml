@@ -1,0 +1,161 @@
+# ===========================================================
+# Gestão de Apoio Arquivístico — Docker Compose (Dev)
+# ===========================================================
+
+services:
+  # ---- Banco de Dados ----
+  postgres:
+    image: postgres:16-alpine
+    container_name: gaa-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: gestao_arquivistica
+      POSTGRES_USER: gestor
+      POSTGRES_PASSWORD: gestor123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gestor -d gestao_arquivistica"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ---- Cache / Filas ----
+  redis:
+    image: redis:7-alpine
+    container_name: gaa-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ---- Object Storage ----
+  minio:
+    image: minio/minio:latest
+    container_name: gaa-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
+  # ---- Antivirus ----
+  clamav:
+    image: clamav/clamav:latest
+    container_name: gaa-clamav
+    restart: unless-stopped
+    ports:
+      - "3310:3310"
+
+  # ---- Backend (FastAPI) ----
+  backend:
+    build:
+      context: ./backend
+      target: development
+    container_name: gaa-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://gestor:gestor123@postgres:5432/gestao_arquivistica
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin123
+      CLAMAV_ENABLED: "true"
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: 3310
+      CLAMAV_FAIL_OPEN: "false"
+    ports:
+      - "8000:8000"
+      - "5678:5678"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      clamav:
+        condition: service_started
+
+  # ---- Celery Worker ----
+  celery-worker:
+    build:
+      context: ./backend
+      target: development
+    container_name: gaa-celery-worker
+    restart: unless-stopped
+    command: celery -A app.tasks worker --loglevel=info --concurrency=2
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://gestor:gestor123@postgres:5432/gestao_arquivistica
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ---- Celery Beat (Scheduler) ----
+  celery-beat:
+    build:
+      context: ./backend
+      target: development
+    container_name: gaa-celery-beat
+    restart: unless-stopped
+    command: celery -A app.tasks beat --loglevel=info
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://gestor:gestor123@postgres:5432/gestao_arquivistica
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+    volumes:
+      - ./backend:/app
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # ---- Frontend (Next.js) ----
+  frontend:
+    build:
+      context: ./frontend
+      target: development
+    container_name: gaa-frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  minio_data:

@@ -1,0 +1,36 @@
+{
+  "prioridade": [
+    "P0",
+    "P1",
+    "P2"
+  ],
+  "fase": [
+    "MVP",
+    "BETA",
+    "GA"
+  ],
+  "area": [
+    "RH",
+    "Jurídico",
+    "Fiscal",
+    "Operações",
+    "Comercial",
+    "TI"
+  ],
+  "seguranca": [
+    "LGPD",
+    "Sigilo",
+    "Criptografia",
+    "Auditoria",
+    "WORM"
+  ],
+  "tipo": [
+    "Entrevista",
+    "PCD",
+    "TTD",
+    "Retencao",
+    "Integracao",
+    "UX",
+    "Dados"
+  ]
+}

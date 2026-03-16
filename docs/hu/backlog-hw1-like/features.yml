@@ -1,0 +1,62 @@
+
+features:
+  EP1:
+    - code: F1
+      name: Catálogo de Roteiros Dinâmicos
+    - code: F2
+      name: Motor de Perguntas Condicionais
+    - code: F3
+      name: Coleta de Evidências e Anexos
+    - code: F4
+      name: Mapeamento Automático para Classes/Metadados
+  EP2:
+    - code: F1
+      name: Modelagem Hierárquica + Versionamento
+    - code: F2
+      name: Metadados de Controle e Segurança
+  EP3:
+    - code: F1
+      name: Regras de Retenção e Eventos
+    - code: F2
+      name: Exceções, Holds e Conflitos
+    - code: F3
+      name: Ordens de Destinação e Termos
+  EP4:
+    - code: F1
+      name: Motor de Retenção Programável
+    - code: F2
+      name: Workflows de Avaliação/Aprovação
+    - code: F3
+      name: Selo de Evidência e Pacote de Auditoria
+  EP5:
+    - code: F1
+      name: Matriz de Rastreabilidade e Painéis
+    - code: F2
+      name: Trilha de Auditoria WORM/Hashchain
+  EP6:
+    - code: F1
+      name: APIs REST/GraphQL
+    - code: F2
+      name: Webhooks de Eventos
+    - code: F3
+      name: Conectores (SharePoint/Alfresco/Docz/Eternal/ERP/IDM)
+  EP7:
+    - code: F1
+      name: RBAC/ABAC e Segregação de Funções
+    - code: F2
+      name: LGPD, Criptografia e Anonimização
+  EP8:
+    - code: F1
+      name: Telemetria e SLOs
+    - code: F2
+      name: HA/DR e Backup
+  EP9:
+    - code: F1
+      name: Inventário e Qualidade de Dados
+    - code: F2
+      name: Estratégia de Corte e Enriquecimento
+  EP10:
+    - code: F1
+      name: Assistente de Entrevista (UX)
+    - code: F2
+      name: Treinamento e Base de Conhecimento

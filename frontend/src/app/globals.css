@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url("https://fonts.googleapis.com/css2?family=Cabin:wght@400;500;600&family=Montserrat:wght@600;700&family=Open+Sans:wght@400;500;600&display=swap");
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 250 52% 32%;
+    --card: 0 0% 100%;
+    --card-foreground: 250 52% 32%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 250 52% 32%;
+    --primary: 324 79% 52%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 239 88% 12%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 240 12% 95%;
+    --muted-foreground: 240 8% 42%;
+    --accent: 177 100% 35%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 240 12% 88%;
+    --input: 240 12% 88%;
+    --ring: 324 79% 52%;
+    --radius: 0.5rem;
+
+    --hw1-pink: 324 79% 52%;
+    --hw1-cyan: 180 100% 35%;
+    --hw1-blue: 244 76% 36%;
+    --hw1-deep-blue: 239 88% 12%;
+    --hw1-teal: 177 100% 45%;
+
+    --font-heading: "Montserrat", sans-serif;
+    --font-body: "Open Sans", sans-serif;
+    --font-alt: "Cabin", sans-serif;
+  }
+
+  .dark {
+    --background: 239 88% 12%;
+    --foreground: 0 0% 100%;
+    --card: 239 88% 12%;
+    --card-foreground: 0 0% 100%;
+    --popover: 239 88% 12%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 324 79% 52%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 250 52% 32%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 250 40% 24%;
+    --muted-foreground: 0 0% 80%;
+    --accent: 177 100% 35%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 250 40% 24%;
+    --input: 250 40% 24%;
+    --ring: 324 79% 52%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-heading);
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-body);
+  }
+}

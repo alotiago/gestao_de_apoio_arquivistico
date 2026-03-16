@@ -1,0 +1,32 @@
+
+epics:
+  - code: EP1
+    name: Entrevistas Assistidas
+    goal: Descobrir séries/risco/base legal via roteiros dinâmicos com evidências.
+  - code: EP2
+    name: Construtor de PCD
+    goal: Modelar função→atividade→série→classe com versionamento e aprovação.
+  - code: EP3
+    name: Construtor de TTD
+    goal: Regras de retenção, eventos, exceções e destinação com termos.
+  - code: EP4
+    name: Execução do Ciclo de Vida
+    goal: Motor de retenção, avaliação e ordens de eliminação/transferência.
+  - code: EP5
+    name: Governança & Auditoria
+    goal: Matriz de rastreabilidade e logs imutáveis WORM/hashchain.
+  - code: EP6
+    name: Integração & Interoperabilidade
+    goal: APIs REST/GraphQL, webhooks e conectores (Docz/Eternal/ECM/IDM).
+  - code: EP7
+    name: Segurança & Privacidade (LGPD)
+    goal: RBAC/ABAC, criptografia, legal hold e controles de sigilo.
+  - code: EP8
+    name: Observabilidade & Operação
+    goal: Métricas, SLOs, HA/DR e backup.
+  - code: EP9
+    name: Dados & Migração
+    goal: Inventário, qualidade, importação e estratégia de corte.
+  - code: EP10
+    name: UX & Adoção
+    goal: Assistente de entrevistas, acessibilidade e base de conhecimento.
