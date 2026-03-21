@@ -1,3 +1,15 @@
+## Como publicar scripts de deploy para produção
+
+Se a pasta `deploy/oci` e o script `deploy_vm.sh` não estiverem no repositório remoto, faça o push assim:
+
+```bash
+cd gestao_de_apoio_arquivistico
+git add deploy/oci
+git commit -m "Adiciona scripts de deploy OCI para produção"
+git push origin main
+```
+
+Depois disso, execute o deploy normalmente na VM de produção.
 # Gestão de Apoio Arquivístico
 
 Sistema de gestão documental com entrevistas assistidas, Plano de Classificação (PCD), Tabela de Temporalidade (TTD) e execução do ciclo de vida, incluindo governança, segurança e integrações.

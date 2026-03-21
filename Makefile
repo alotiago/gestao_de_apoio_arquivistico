@@ -5,7 +5,8 @@
 .PHONY: help up down build logs backend-logs frontend-logs \
 	migrate migrate-create db-reset test test-cov \
 	load-k6 load-locust security-zap \
-	lint format backend-shell psql redis-cli
+	lint format backend-shell psql redis-cli \
+	oci-up oci-down oci-logs oci-migrate oci-deploy oci-reset-redeploy
 
 help: ## Exibir esta ajuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -99,3 +100,23 @@ frontend-lint: ## Lint do frontend
 # ---- Celery ----
 celery-log: ## Ver logs do celery worker
 	docker compose logs -f celery-worker
+
+# ---- OCI / Produção ----
+oci-up: ## Subir stack OCI (docker-compose.oci.yml)
+	docker compose -f docker-compose.oci.yml up -d --build
+
+oci-down: ## Parar stack OCI
+	docker compose -f docker-compose.oci.yml down
+
+oci-logs: ## Ver logs da stack OCI
+	docker compose -f docker-compose.oci.yml logs -f
+
+oci-migrate: ## Aplicar migrations na stack OCI
+	docker compose -f docker-compose.oci.yml exec -T backend alembic upgrade head
+
+oci-deploy: ## Subir stack OCI e aplicar migrations
+	$(MAKE) oci-up
+	$(MAKE) oci-migrate
+
+oci-reset-redeploy: ## Resetar stack OCI do GAA e subir do zero na VM
+	bash deploy/oci/reset_and_redeploy_vm.sh
