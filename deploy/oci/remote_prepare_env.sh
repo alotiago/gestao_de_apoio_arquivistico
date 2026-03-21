@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP_DIR="${APP_DIR:-/opt/gestao_de_apoio_arquivistico}"
+HOST_IP="${HOST_IP:-10.10.11.92}"
+APP_ENVIRONMENT="${APP_ENVIRONMENT:-production}"
+APP_NAME="${APP_NAME:-Gestao de Apoio Arquivistico}"
+UVICORN_WORKERS="${UVICORN_WORKERS:-2}"
+ENABLE_METRICS="${ENABLE_METRICS:-true}"
+PROMETHEUS_ENABLED="${PROMETHEUS_ENABLED:-true}"
+
+cd "${APP_DIR}"
+
+need_cmd() {
+  command -v "$1" >/dev/null 2>&1 || { echo "Falta comando: $1"; exit 1; }
+}
+
+need_cmd openssl
+
+rand_hex() {
+  openssl rand -hex "$1"
+}
+
+rand_b64url() {
+  openssl rand -base64 "$1" | tr -d '\n' | tr '/+' '_-'
+}
+
+POSTGRES_PASSWORD="$(rand_hex 20)"
+REDIS_PASSWORD="$(rand_hex 20)"
+MINIO_ROOT_PASSWORD="$(rand_hex 20)"
+JWT_SECRET_KEY="$(rand_b64url 48)"
+JWT_REFRESH_SECRET_KEY="$(rand_b64url 48)"
+
+cat > .env <<EOF
+NEXT_PUBLIC_API_URL=http://${HOST_IP}/api/v1
+
+POSTGRES_DB=gestao_arquivistica
+POSTGRES_USER=gestor
+POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+
+REDIS_PASSWORD=${REDIS_PASSWORD}
+CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD}@redis:6379/2
+CELERY_CONCURRENCY=2
+
+JWT_SECRET_KEY=${JWT_SECRET_KEY}
+JWT_REFRESH_SECRET_KEY=${JWT_REFRESH_SECRET_KEY}
+JWT_ALGORITHM=HS256
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
+JWT_REFRESH_TOKEN_EXPIRE_MINUTES=10080
+
+MINIO_ROOT_USER=minioadmin
+MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+S3_ENDPOINT=http://minio:9000
+S3_ACCESS_KEY=minioadmin
+S3_SECRET_KEY=${MINIO_ROOT_PASSWORD}
+S3_BUCKET=gestao-arquivistica
+S3_REGION=us-east-1
+S3_BUCKET_EVIDENCIAS=evidencias
+S3_BUCKET_WORM=worm-logs
+
+CORS_ORIGINS=["http://${HOST_IP}"]
+
+MAX_UPLOAD_SIZE_MB=50
+
+CLAMAV_ENABLED=true
+CLAMAV_HOST=clamav
+CLAMAV_PORT=3310
+CLAMAV_TIMEOUT_SECONDS=10
+CLAMAV_FAIL_OPEN=false
+
+ENABLE_METRICS=${ENABLE_METRICS}
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+PROMETHEUS_ENABLED=${PROMETHEUS_ENABLED}
+
+APP_NAME=${APP_NAME}
+ENVIRONMENT=${APP_ENVIRONMENT}
+DEBUG=false
+LOG_LEVEL=INFO
+UVICORN_WORKERS=${UVICORN_WORKERS}
+EOF
+
+chmod 600 .env
+
+echo "env-ready"
