@@ -3,11 +3,24 @@ set -euo pipefail
 
 APP_DIR="${APP_DIR:-/opt/gestao_de_apoio_arquivistico}"
 HOST_IP="${HOST_IP:-10.10.11.92}"
+APP_DOMAIN="${APP_DOMAIN:-}"
+PUBLIC_SCHEME="${PUBLIC_SCHEME:-https}"
 APP_ENVIRONMENT="${APP_ENVIRONMENT:-production}"
 APP_NAME="${APP_NAME:-Gestao de Apoio Arquivistico}"
 UVICORN_WORKERS="${UVICORN_WORKERS:-2}"
 ENABLE_METRICS="${ENABLE_METRICS:-true}"
 PROMETHEUS_ENABLED="${PROMETHEUS_ENABLED:-true}"
+NGINX_BIND="${NGINX_BIND:-127.0.0.1:8080:80}"
+
+if [[ -n "${APP_DOMAIN}" ]]; then
+  PUBLIC_HOST="${APP_DOMAIN}"
+else
+  PUBLIC_HOST="${HOST_IP}"
+  PUBLIC_SCHEME="http"
+fi
+
+PUBLIC_BASE_URL="${PUBLIC_SCHEME}://${PUBLIC_HOST}"
+HEALTHCHECK_URL="http://127.0.0.1:8080/health"
 
 cd "${APP_DIR}"
 
@@ -25,14 +38,30 @@ rand_b64url() {
   openssl rand -base64 "$1" | tr -d '\n' | tr '/+' '_-'
 }
 
-POSTGRES_PASSWORD="$(rand_hex 20)"
-REDIS_PASSWORD="$(rand_hex 20)"
-MINIO_ROOT_PASSWORD="$(rand_hex 20)"
-JWT_SECRET_KEY="$(rand_b64url 48)"
-JWT_REFRESH_SECRET_KEY="$(rand_b64url 48)"
+existing_env_value() {
+  local key="$1"
+
+  if [[ ! -f .env ]]; then
+    return 1
+  fi
+
+  grep -E "^${key}=" .env | tail -n 1 | cut -d'=' -f2-
+}
+
+POSTGRES_PASSWORD="$(existing_env_value POSTGRES_PASSWORD || true)"
+REDIS_PASSWORD="$(existing_env_value REDIS_PASSWORD || true)"
+MINIO_ROOT_PASSWORD="$(existing_env_value MINIO_ROOT_PASSWORD || true)"
+JWT_SECRET_KEY="$(existing_env_value JWT_SECRET_KEY || true)"
+JWT_REFRESH_SECRET_KEY="$(existing_env_value JWT_REFRESH_SECRET_KEY || true)"
+
+POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(rand_hex 20)}"
+REDIS_PASSWORD="${REDIS_PASSWORD:-$(rand_hex 20)}"
+MINIO_ROOT_PASSWORD="${MINIO_ROOT_PASSWORD:-$(rand_hex 20)}"
+JWT_SECRET_KEY="${JWT_SECRET_KEY:-$(rand_b64url 48)}"
+JWT_REFRESH_SECRET_KEY="${JWT_REFRESH_SECRET_KEY:-$(rand_b64url 48)}"
 
 cat > .env <<EOF
-NEXT_PUBLIC_API_URL=http://${HOST_IP}/api/v1
+NEXT_PUBLIC_API_URL=${PUBLIC_BASE_URL}/api/v1
 
 POSTGRES_DB=gestao_arquivistica
 POSTGRES_USER=gestor
@@ -58,7 +87,10 @@ S3_REGION=us-east-1
 S3_BUCKET_EVIDENCIAS=evidencias
 S3_BUCKET_WORM=worm-logs
 
-CORS_ORIGINS=["http://${HOST_IP}"]
+CORS_ORIGINS=["${PUBLIC_BASE_URL}"]
+
+NGINX_BIND=${NGINX_BIND}
+HEALTHCHECK_URL=${HEALTHCHECK_URL}
 
 MAX_UPLOAD_SIZE_MB=50
 

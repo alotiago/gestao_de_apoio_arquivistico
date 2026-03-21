@@ -5,6 +5,7 @@ APP_DIR="${APP_DIR:-/opt/gestao_de_apoio_arquivistico}"
 REPO_URL="${REPO_URL:-}"
 BRANCH="${BRANCH:-main}"
 ENABLE_UFW="${ENABLE_UFW:-true}"
+HEALTHCHECK_URL="${HEALTHCHECK_URL:-}"
 
 log() {
   printf '\n[%s] %s\n' "$(date '+%H:%M:%S')" "$1"
@@ -63,6 +64,14 @@ if grep -q "SEU_IP_OU_DOMINIO\|CHANGE_ME_" .env; then
   exit 1
 fi
 
+if [ -z "${HEALTHCHECK_URL}" ]; then
+  HEALTHCHECK_URL="$(grep -E '^HEALTHCHECK_URL=' .env | cut -d'=' -f2- || true)"
+fi
+
+if [ -z "${HEALTHCHECK_URL}" ]; then
+  HEALTHCHECK_URL="http://localhost/health"
+fi
+
 if [ "${ENABLE_UFW}" = "true" ]; then
   log "Configurando firewall (UFW): 22, 80, 443"
   ufw allow OpenSSH || true
@@ -77,14 +86,14 @@ docker compose -f docker-compose.oci.yml up -d --build
 log "Aplicando migrations"
 docker compose -f docker-compose.oci.yml exec -T backend alembic upgrade head
 
-log "Aguardando healthcheck via Nginx"
+log "Aguardando healthcheck via Nginx em ${HEALTHCHECK_URL}"
 for i in $(seq 1 40); do
-  if curl -fsS http://localhost/health >/dev/null; then
+  if curl -fsS "${HEALTHCHECK_URL}" >/dev/null; then
     break
   fi
   sleep 3
   if [ "$i" -eq 40 ]; then
-    echo "Timeout aguardando /health. Verifique logs: docker compose -f docker-compose.oci.yml logs --tail=200"
+    echo "Timeout aguardando healthcheck em ${HEALTHCHECK_URL}. Verifique logs: docker compose -f docker-compose.oci.yml logs --tail=200"
     exit 1
   fi
 done
