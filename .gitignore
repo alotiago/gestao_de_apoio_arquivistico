@@ -36,6 +36,7 @@ out/
 .env
 .env.local
 .env.*.local
+.env.produto.safe
 
 # ---- IDE ----
 .vscode/
