@@ -37,6 +37,7 @@ out/
 .env.local
 .env.*.local
 .env.produto.safe
+.env.homolog
 
 # ---- IDE ----
 .vscode/
