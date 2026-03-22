@@ -116,6 +116,8 @@ async def swagger_ui_redirect() -> HTMLResponse:
 _internal = [Depends(require_internal)]
 
 app.include_router(health.router, tags=["Health"])
+# Alias /api/v1 para saúde e métricas (consumido pelo frontend via NEXT_PUBLIC_API_URL)
+app.include_router(health.router, prefix="/api/v1", tags=["Health"], include_in_schema=False)
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Autenticação"])
 app.include_router(roteiros.router, prefix="/api/v1/roteiros", tags=["EP1 — Roteiros"], dependencies=_internal)
 app.include_router(pcd.router, prefix="/api/v1/pcd", tags=["EP2 — PCD"], dependencies=_internal)

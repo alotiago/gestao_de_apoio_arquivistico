@@ -9,7 +9,8 @@ from app.services.observability import observability_store
 
 class ObservabilityMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
-        if request.url.path in {"/health", "/ready", "/metrics/summary"}:
+        if request.url.path in {"/health", "/ready", "/metrics/summary",
+                                   "/api/v1/health", "/api/v1/ready", "/api/v1/metrics/summary"}:
             return await call_next(request)
 
         started_at = time.perf_counter()
