@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BarChart3,
+  ClipboardList,
   Database,
   FileText,
   FolderTree,
@@ -22,6 +23,7 @@ import { cn } from "@/lib/utils";
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
   { name: "Entrevistas", href: "/dashboard/entrevistas", icon: FileText },
+  { name: "Gestão de Entrevistas", href: "/dashboard/entrevistas/admin", icon: ClipboardList },
   { name: "PCD", href: "/dashboard/pcd", icon: FolderTree },
   { name: "TTD", href: "/dashboard/ttd", icon: Clock },
   { name: "Ciclo de Vida", href: "/dashboard/ciclo-vida", icon: RotateCcw },

@@ -323,6 +323,105 @@ async def criar_roteiro(
     return roteiro
 
 
+# ========== Admin: listagem global de entrevistas ==========
+
+class EntrevistaAdminItem(BaseModel):
+    id: uuid.UUID
+    roteiro_id: uuid.UUID
+    roteiro_titulo: str
+    entrevistador_id: uuid.UUID | None
+    cliente_id: uuid.UUID | None
+    cliente_email: str | None
+    status: str
+    motivo_devolucao: str | None
+    total_respostas: int
+    created_at: datetime
+    completed_at: datetime | None
+
+
+class EntrevistaAdminPaginado(BaseModel):
+    items: list[EntrevistaAdminItem]
+    total: int
+    page: int
+    per_page: int
+
+
+@router.get("/entrevistas", response_model=EntrevistaAdminPaginado)
+async def listar_todas_entrevistas(
+    status_filtro: str | None = Query(None, alias="status"),
+    roteiro_id_q: uuid.UUID | None = Query(None, alias="roteiro_id"),
+    busca: str | None = Query(None, description="Busca por email do cliente"),
+    data_de: datetime | None = Query(None),
+    data_ate: datetime | None = Query(None),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Listar todas as entrevistas (admin) com filtros e paginação."""
+    base = select(Entrevista)
+    count_q = select(func.count()).select_from(Entrevista)
+
+    if status_filtro:
+        base = base.where(Entrevista.status == status_filtro)
+        count_q = count_q.where(Entrevista.status == status_filtro)
+    if roteiro_id_q:
+        base = base.where(Entrevista.roteiro_id == roteiro_id_q)
+        count_q = count_q.where(Entrevista.roteiro_id == roteiro_id_q)
+    if data_de:
+        base = base.where(Entrevista.created_at >= data_de)
+        count_q = count_q.where(Entrevista.created_at >= data_de)
+    if data_ate:
+        base = base.where(Entrevista.created_at <= data_ate)
+        count_q = count_q.where(Entrevista.created_at <= data_ate)
+
+    total = (await db.execute(count_q)).scalar() or 0
+    result = await db.execute(
+        base.order_by(Entrevista.created_at.desc())
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+    )
+    entrevistas = result.scalars().all()
+
+    # enriquece com título do roteiro e email do cliente
+    rot_ids = {e.roteiro_id for e in entrevistas}
+    cli_ids = {e.cliente_id for e in entrevistas if e.cliente_id}
+
+    roteiros_map: dict = {}
+    if rot_ids:
+        r = await db.execute(select(Roteiro).where(Roteiro.id.in_(rot_ids)))
+        roteiros_map = {rt.id: rt for rt in r.scalars().all()}
+
+    clientes_map: dict = {}
+    if cli_ids:
+        c = await db.execute(select(User).where(User.id.in_(cli_ids)))
+        clientes_map = {u.id: u for u in c.scalars().all()}
+
+    items: list[EntrevistaAdminItem] = []
+    for e in entrevistas:
+        roteiro_obj = roteiros_map.get(e.roteiro_id)
+        cliente_obj = clientes_map.get(e.cliente_id) if e.cliente_id else None
+        cliente_email = cliente_obj.email if cliente_obj else None
+        if busca and (not cliente_email or busca.lower() not in cliente_email.lower()):
+            total -= 1
+            continue
+        items.append(EntrevistaAdminItem(
+            id=e.id,
+            roteiro_id=e.roteiro_id,
+            roteiro_titulo=roteiro_obj.titulo if roteiro_obj else str(e.roteiro_id),
+            entrevistador_id=e.entrevistador_id,
+            cliente_id=e.cliente_id,
+            cliente_email=cliente_email,
+            status=e.status,
+            motivo_devolucao=e.motivo_devolucao,
+            total_respostas=len(e.respostas) if e.respostas else 0,
+            created_at=e.created_at,
+            completed_at=e.completed_at,
+        ))
+
+    return EntrevistaAdminPaginado(items=items, total=total, page=page, per_page=per_page)
+
+
 @router.get("/{roteiro_id}", response_model=RoteiroResponse)
 async def obter_roteiro(
     roteiro_id: uuid.UUID,
