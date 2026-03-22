@@ -1,5 +1,5 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
-import { clearAuthCookies } from "@/lib/auth-cookies";
+import { clearAuthCookies, setAuthCookies } from "@/lib/auth-cookies";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
@@ -56,6 +56,8 @@ async function refreshAccessToken(): Promise<TokenResponse | null> {
         if (data.refresh_token) {
           localStorage.setItem("refresh_token", data.refresh_token);
         }
+        // Atualiza o cookie para manter middleware sincronizado com localStorage
+        setAuthCookies(data.access_token, data.refresh_token);
         return data;
       })
       .catch(() => {
@@ -81,7 +83,7 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Interceptor para refresh automático em 401
+// Interceptor para refresh automático em 401 e logout em 403 de sessão inválida
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -98,6 +100,14 @@ api.interceptors.response.use(
       }
 
       clearAuthAndRedirectToLogin();
+    }
+
+    // 403 "Acesso restrito a usuários internos" → sessão com role errado, faz logout
+    if (axiosError.response?.status === 403) {
+      const detail = (axiosError.response.data as { detail?: string } | undefined)?.detail ?? "";
+      if (detail === "Acesso restrito a usuários internos") {
+        clearAuthAndRedirectToLogin();
+      }
     }
 
     return Promise.reject(error);
