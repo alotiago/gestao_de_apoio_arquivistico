@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useContext } from "react";
 import {
   BarChart3,
   ClipboardList,
@@ -19,6 +20,7 @@ import {
   FileBarChart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SidebarContext } from "@/lib/sidebar-context";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
@@ -41,9 +43,27 @@ const secondaryNav = [
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const sidebarContext = useContext(SidebarContext);
+  const sidebarOpen = sidebarContext?.sidebarOpen ?? false;
+  const setSidebarOpen = sidebarContext?.setSidebarOpen;
 
   return (
-    <aside className="flex w-64 flex-col border-r border-secondary/20 bg-secondary text-secondary-foreground" aria-label="Navegação lateral">
+    <>
+      {/* Overlay mobile */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/50 sm:hidden"
+          onClick={() => setSidebarOpen?.(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-secondary/20 bg-secondary text-secondary-foreground transition-transform duration-200 sm:relative sm:z-auto sm:translate-x-0 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+        aria-label="Navegação lateral"
+      >
       {/* Logo */}
       <div className="flex h-16 items-center gap-3 border-b border-secondary-foreground/15 bg-secondary px-5">
         <Image
@@ -71,6 +91,7 @@ export function AppSidebar() {
             <Link
               key={item.name}
               href={item.href}
+              onClick={() => setSidebarOpen?.(false)}
               aria-current={isActive ? "page" : undefined}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
@@ -96,6 +117,7 @@ export function AppSidebar() {
             <Link
               key={item.name}
               href={item.href}
+              onClick={() => setSidebarOpen?.(false)}
               aria-current={isActive ? "page" : undefined}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
@@ -116,5 +138,5 @@ export function AppSidebar() {
         <p className="text-xs text-secondary-foreground/65 text-center">v0.1.0 — Sprint 0</p>
       </div>
     </aside>
-  );
+    </>\n  );
 }

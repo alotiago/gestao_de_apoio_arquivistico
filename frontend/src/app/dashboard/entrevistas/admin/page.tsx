@@ -511,105 +511,194 @@ export default function AdminEntrevistasPage() {
           )}
 
           {!error && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/30">
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">ID</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Roteiro</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Cliente</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Respostas</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Criado em</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Concluído em</th>
-                    <th className="px-4 py-3 text-right font-medium text-muted-foreground">Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data?.items.length === 0 && (
-                    <tr>
-                      <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">
-                        Nenhuma entrevista encontrada com os filtros aplicados.
-                      </td>
+            <>
+              {/* Desktop Table */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/30">
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">ID</th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Roteiro</th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Cliente</th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Respostas</th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Criado em</th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Concluído em</th>
+                      <th className="px-4 py-3 text-right font-medium text-muted-foreground">Ações</th>
                     </tr>
-                  )}
-                  {data?.items.map((item) => (
-                    <tr key={item.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
-                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                        {shortId(item.id)}
-                      </td>
-                      <td className="px-4 py-3 max-w-[180px] truncate font-medium">
-                        {item.roteiro_titulo}
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground max-w-[160px] truncate">
-                        {item.cliente_email ?? <span className="italic">Sem cliente</span>}
-                      </td>
-                      <td className="px-4 py-3">
-                        <StatusBadge status={item.status} />
-                        {item.motivo_devolucao && (
-                          <p className="mt-1 text-xs text-red-500 truncate max-w-[140px]" title={item.motivo_devolucao}>
-                            {item.motivo_devolucao}
-                          </p>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-muted text-xs font-semibold">
-                          {item.total_respostas}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
-                        {fmt(item.created_at)}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
-                        {fmt(item.completed_at)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-1">
-                          {/* Detalhes */}
-                          <button
-                            title="Ver detalhes"
-                            className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition"
-                            onClick={() => verDetalhes(item)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </button>
-                          {/* Devolver (só se submetida) */}
-                          {item.status === "submetida" && (
-                            <button
-                              title="Devolver"
-                              className="rounded p-1.5 text-red-400 hover:bg-red-50 hover:text-red-600 transition"
-                              onClick={() => { setModalDevolver(item); setMotivoDevolucao(""); setActionError(null); }}
-                            >
-                              <RotateCcw className="h-4 w-4" />
-                            </button>
+                  </thead>
+                  <tbody>
+                    {data?.items.length === 0 && (
+                      <tr>
+                        <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">
+                          Nenhuma entrevista encontrada com os filtros aplicados.
+                        </td>
+                      </tr>
+                    )}
+                    {data?.items.map((item) => (
+                      <tr key={item.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
+                        <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                          {shortId(item.id)}
+                        </td>
+                        <td className="px-4 py-3 max-w-[180px] truncate font-medium">
+                          {item.roteiro_titulo}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground max-w-[160px] truncate">
+                          {item.cliente_email ?? <span className="italic">Sem cliente</span>}
+                        </td>
+                        <td className="px-4 py-3">
+                          <StatusBadge status={item.status} />
+                          {item.motivo_devolucao && (
+                            <p className="mt-1 text-xs text-red-500 truncate max-w-[140px]" title={item.motivo_devolucao}>
+                              {item.motivo_devolucao}
+                            </p>
                           )}
-                          {/* Concluir */}
-                          {(item.status === "em_andamento" || item.status === "submetida") && (
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-muted text-xs font-semibold">
+                            {item.total_respostas}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
+                          {fmt(item.created_at)}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
+                          {fmt(item.completed_at)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-1">
+                            {/* Detalhes */}
                             <button
-                              title="Concluir"
-                              className="rounded p-1.5 text-green-500 hover:bg-green-50 hover:text-green-700 transition"
-                              onClick={() => { setModalConfirm({ item, acao: "concluida" }); setActionError(null); }}
+                              title="Ver detalhes"
+                              className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition"
+                              onClick={() => verDetalhes(item)}
                             >
-                              <CheckCircle2 className="h-4 w-4" />
+                              <Eye className="h-4 w-4" />
                             </button>
-                          )}
-                          {/* Cancelar */}
-                          {item.status !== "concluida" && item.status !== "cancelada" && (
-                            <button
-                              title="Cancelar"
-                              className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition"
-                              onClick={() => { setModalConfirm({ item, acao: "cancelada" }); setActionError(null); }}
-                            >
-                              <XCircle className="h-4 w-4" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                            {/* Devolver (só se submetida) */}
+                            {item.status === "submetida" && (
+                              <button
+                                title="Devolver"
+                                className="rounded p-1.5 text-red-400 hover:bg-red-50 hover:text-red-600 transition"
+                                onClick={() => { setModalDevolver(item); setMotivoDevolucao(""); setActionError(null); }}
+                              >
+                                <RotateCcw className="h-4 w-4" />
+                              </button>
+                            )}
+                            {/* Concluir */}
+                            {(item.status === "em_andamento" || item.status === "submetida") && (
+                              <button
+                                title="Concluir"
+                                className="rounded p-1.5 text-green-500 hover:bg-green-50 hover:text-green-700 transition"
+                                onClick={() => { setModalConfirm({ item, acao: "concluida" }); setActionError(null); }}
+                              >
+                                <CheckCircle2 className="h-4 w-4" />
+                              </button>
+                            )}
+                            {/* Cancelar */}
+                            {item.status !== "concluida" && item.status !== "cancelada" && (
+                              <button
+                                title="Cancelar"
+                                className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition"
+                                onClick={() => { setModalConfirm({ item, acao: "cancelada" }); setActionError(null); }}
+                              >
+                                <XCircle className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Cards */}
+              <div className="sm:hidden space-y-3">
+                {data?.items.length === 0 && (
+                  <div className="text-center py-10 text-muted-foreground">
+                    Nenhuma entrevista encontrada com os filtros aplicados.
+                  </div>
+                )}
+                {data?.items.map((item) => (
+                  <div key={item.id} className="border rounded-lg p-4 bg-card hover:bg-muted/50 transition-colors space-y-3">
+                    {/* Header */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-medium line-clamp-2">{item.roteiro_titulo}</p>
+                        <p className="text-xs text-muted-foreground">{item.cliente_email ?? "Sem cliente"}</p>
+                      </div>
+                      <StatusBadge status={item.status} />
+                    </div>
+
+                    {/* Details Grid */}
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <p className="text-muted-foreground">ID</p>
+                        <p className="font-mono text-xs">{shortId(item.id)}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Respostas</p>
+                        <p className="font-semibold">{item.total_respostas}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Criado em</p>
+                        <p className="text-xs">{fmt(item.created_at)}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Concluído em</p>
+                        <p className="text-xs">{fmt(item.completed_at) || "—"}</p>
+                      </div>
+                    </div>
+
+                    {item.motivo_devolucao && (
+                      <div className="bg-red-50 border border-red-200 rounded p-2">
+                        <p className="text-xs font-medium text-red-600">Motivo:</p>
+                        <p className="text-xs text-red-600 line-clamp-2">{item.motivo_devolucao}</p>
+                      </div>
+                    )}
+
+                    {/* Actions Row */}
+                    <div className="flex items-center gap-2 pt-2 border-t">
+                      <button
+                        title="Ver detalhes"
+                        className="flex-1 px-2 py-2 rounded bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground transition text-xs font-medium flex items-center justify-center gap-1"
+                        onClick={() => verDetalhes(item)}
+                      >
+                        <Eye className="h-4 w-4" /> Detalhes
+                      </button>
+                      {item.status === "submetida" && (
+                        <button
+                          title="Devolver"
+                          className="flex-1 px-2 py-2 rounded bg-red-50 hover:bg-red-100 text-red-600 transition text-xs font-medium flex items-center justify-center gap-1"
+                          onClick={() => { setModalDevolver(item); setMotivoDevolucao(""); setActionError(null); }}
+                        >
+                          <RotateCcw className="h-4 w-4" /> Devolver
+                        </button>
+                      )}
+                      {(item.status === "em_andamento" || item.status === "submetida") && (
+                        <button
+                          title="Concluir"
+                          className="flex-1 px-2 py-2 rounded bg-green-50 hover:bg-green-100 text-green-600 transition text-xs font-medium flex items-center justify-center gap-1"
+                          onClick={() => { setModalConfirm({ item, acao: "concluida" }); setActionError(null); }}
+                        >
+                          <CheckCircle2 className="h-4 w-4" /> Concluir
+                        </button>
+                      )}
+                      {item.status !== "concluida" && item.status !== "cancelada" && (
+                        <button
+                          title="Cancelar"
+                          className="flex-1 px-2 py-2 rounded bg-gray-100 hover:bg-gray-200 text-gray-600 transition text-xs font-medium flex items-center justify-center gap-1"
+                          onClick={() => { setModalConfirm({ item, acao: "cancelada" }); setActionError(null); }}
+                        >
+                          <XCircle className="h-4 w-4" /> Cancelar
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
 
           {/* Paginação */}
@@ -644,7 +733,7 @@ export default function AdminEntrevistasPage() {
       {/* ─── Modal: Devolver ──────────────────────────────────────────────────── */}
       {modalDevolver && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl border bg-background shadow-xl">
+          <div className="w-full max-w-md rounded-xl border bg-background shadow-xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b px-5 py-4">
               <h2 className="font-semibold flex items-center gap-2">
                 <RotateCcw className="h-4 w-4 text-red-500" />
@@ -705,7 +794,7 @@ export default function AdminEntrevistasPage() {
       {/* ─── Modal: Confirmar Concluir/Cancelar ──────────────────────────────── */}
       {modalConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-sm rounded-xl border bg-background shadow-xl">
+          <div className="w-full max-w-sm rounded-xl border bg-background shadow-xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b px-5 py-4">
               <h2 className="font-semibold">
                 {modalConfirm.acao === "concluida" ? "Concluir Entrevista" : "Cancelar Entrevista"}
