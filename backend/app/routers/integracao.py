@@ -183,3 +183,51 @@ async def importar_acervo_csv(
     await db.flush()
     await db.refresh(importacao)
     return importacao
+
+
+@router.post("/importacoes/{importacao_id}/reprocessar", response_model=ImportacaoAcervoResponse, status_code=status.HTTP_201_CREATED)
+async def reprocessar_importacao(
+    importacao_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Reprocessar importação existente reaplicando mapping/resultados registrados."""
+    origem = await db.get(ImportacaoAcervo, importacao_id)
+    if not origem:
+        raise HTTPException(status_code=404, detail="Importação não encontrada")
+    if origem.status == "excluida":
+        raise HTTPException(status_code=400, detail="Importação excluída não pode ser reprocessada")
+
+    clone = ImportacaoAcervo(
+        nome_arquivo=origem.nome_arquivo,
+        status=origem.status,
+        mapping=dict(origem.mapping or {}),
+        total_registros=origem.total_registros,
+        total_sucesso=origem.total_sucesso,
+        total_erros=origem.total_erros,
+        resultados=list(origem.resultados or []),
+        observacoes=f"Reprocessada a partir de {origem.id}",
+        criado_por=current_user.id,
+    )
+    db.add(clone)
+    await db.flush()
+    await db.refresh(clone)
+    return clone
+
+
+@router.delete("/importacoes/{importacao_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def excluir_importacao(
+    importacao_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Excluir logicamente importação sem sucesso persistido."""
+    item = await db.get(ImportacaoAcervo, importacao_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Importação não encontrada")
+    if item.total_sucesso > 0:
+        raise HTTPException(status_code=400, detail="Importação com registros de sucesso não pode ser excluída")
+
+    item.status = "excluida"
+    await db.flush()
+    return None

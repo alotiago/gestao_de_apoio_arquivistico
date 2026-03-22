@@ -14,6 +14,7 @@ from app.models.ciclo_vida import EventoInterno, JobRetencao, SeloEvidencia, Wor
 from app.models.roteiro import Condicao, Entrevista, Evidencia, Pergunta, Roteiro
 from app.models.governanca import AuditLog, MatrizRastreabilidade
 from app.models.integracao import ImportacaoAcervo
+from app.models.conhecimento import TemplateConhecimento, TrilhaConhecimento, TrilhaProgresso
 from app.models.pcd import PcdNivel, PcdVersao
 from app.models.ttd import LegalHold, OrdemDestinacao, RegraRetencao
 from app.models.user import User
@@ -71,6 +72,9 @@ class FakeAsyncSession:
         self.selos: dict[uuid.UUID, SeloEvidencia] = {}
         self.eventos: dict[uuid.UUID, EventoInterno] = {}
         self.importacoes: dict[uuid.UUID, ImportacaoAcervo] = {}
+        self.templates_conhecimento: dict[uuid.UUID, TemplateConhecimento] = {}
+        self.trilhas_conhecimento: dict[uuid.UUID, TrilhaConhecimento] = {}
+        self.trilhas_progresso: dict[uuid.UUID, TrilhaProgresso] = {}
         self.regras_cleansing: dict[uuid.UUID, RegraCleansing] = {}
         self.inventarios: dict[uuid.UUID, InventarioQualidade] = {}
         self.ondas: dict[uuid.UUID, OndaMigracao] = {}
@@ -147,6 +151,9 @@ class FakeAsyncSession:
 
         if model is LegalHold:
             items = list(self.holds.values())
+            if "pcd_nivel_id" in filters:
+                nivel_id = filters["pcd_nivel_id"]
+                items = [item for item in items if item.pcd_nivel_id == nivel_id]
             if "status" in filters:
                 status_filter = filters["status"]
                 items = [item for item in items if item.status == status_filter]
@@ -189,6 +196,24 @@ class FakeAsyncSession:
 
         if model is ImportacaoAcervo:
             items = list(self.importacoes.values())
+            for filter_key, filter_value in filters.items():
+                items = [item for item in items if getattr(item, filter_key, None) == filter_value]
+            return FakeExecuteResult(items)
+
+        if model is TemplateConhecimento:
+            items = list(self.templates_conhecimento.values())
+            for filter_key, filter_value in filters.items():
+                items = [item for item in items if getattr(item, filter_key, None) == filter_value]
+            return FakeExecuteResult(items)
+
+        if model is TrilhaConhecimento:
+            items = list(self.trilhas_conhecimento.values())
+            for filter_key, filter_value in filters.items():
+                items = [item for item in items if getattr(item, filter_key, None) == filter_value]
+            return FakeExecuteResult(items)
+
+        if model is TrilhaProgresso:
+            items = list(self.trilhas_progresso.values())
             for filter_key, filter_value in filters.items():
                 items = [item for item in items if getattr(item, filter_key, None) == filter_value]
             return FakeExecuteResult(items)
@@ -278,6 +303,12 @@ class FakeAsyncSession:
             return self.eventos.get(key)
         if model is ImportacaoAcervo:
             return self.importacoes.get(key)
+        if model is TemplateConhecimento:
+            return self.templates_conhecimento.get(key)
+        if model is TrilhaConhecimento:
+            return self.trilhas_conhecimento.get(key)
+        if model is TrilhaProgresso:
+            return self.trilhas_progresso.get(key)
         if model is RegraCleansing:
             return self.regras_cleansing.get(key)
         if model is InventarioQualidade:
@@ -467,6 +498,38 @@ class FakeAsyncSession:
             self.importacoes[instance.id] = instance
             return
 
+        if isinstance(instance, TemplateConhecimento):
+            if instance.id is None:
+                instance.id = uuid.uuid4()
+            if instance.created_at is None:
+                instance.created_at = self.now
+            if instance.updated_at is None:
+                instance.updated_at = self.now
+            if instance.tags is None:
+                instance.tags = []
+            self.templates_conhecimento[instance.id] = instance
+            return
+
+        if isinstance(instance, TrilhaConhecimento):
+            if instance.id is None:
+                instance.id = uuid.uuid4()
+            if instance.created_at is None:
+                instance.created_at = self.now
+            if instance.updated_at is None:
+                instance.updated_at = self.now
+            if instance.etapas is None:
+                instance.etapas = []
+            self.trilhas_conhecimento[instance.id] = instance
+            return
+
+        if isinstance(instance, TrilhaProgresso):
+            if instance.id is None:
+                instance.id = uuid.uuid4()
+            if instance.updated_at is None:
+                instance.updated_at = self.now
+            self.trilhas_progresso[instance.id] = instance
+            return
+
         if isinstance(instance, RegraCleansing):
             if instance.id is None:
                 instance.id = uuid.uuid4()
@@ -538,6 +601,8 @@ class FakeAsyncSession:
             return
 
         if isinstance(instance, AuditLog):
+            if instance.id is not None and instance.id >= self._audit_seq:
+                self._audit_seq = instance.id + 1
             if instance.id is None:
                 instance.id = self._audit_seq
                 self._audit_seq += 1
@@ -548,11 +613,21 @@ class FakeAsyncSession:
     async def delete(self, instance: object) -> None:
         if isinstance(instance, PcdNivel) and instance.id in self.pcd:
             del self.pcd[instance.id]
+        if isinstance(instance, RegraRetencao) and instance.id in self.regras:
+            del self.regras[instance.id]
+        if isinstance(instance, MatrizRastreabilidade) and instance.id in self.matriz:
+            del self.matriz[instance.id]
+        if isinstance(instance, ImportacaoAcervo) and instance.id in self.importacoes:
+            del self.importacoes[instance.id]
+        if isinstance(instance, JobRetencao) and instance.id in self.jobs:
+            del self.jobs[instance.id]
+        if isinstance(instance, SeloEvidencia) and instance.id in self.selos:
+            del self.selos[instance.id]
 
     async def flush(self) -> None:
         return None
 
-    async def refresh(self, instance: object, attrs: list[str] | None = None) -> None:
+    async def refresh(self, instance: object, attrs: list[str] | None = None, *, attribute_names: list[str] | None = None) -> None:
         return None
 
 
@@ -848,10 +923,19 @@ def test_ttd_regras_holds_fluxo_basico() -> None:
             },
         )
         assert create_rule.status_code == 201
+        regra_id = create_rule.json()["id"]
 
         list_rules = client.get("/api/v1/ttd/regras")
         assert list_rules.status_code == 200
         assert len(list_rules.json()) == 1
+
+        patch_rule = client.patch(
+            f"/api/v1/ttd/regras/{regra_id}",
+            json={"prazo_dias": 730, "base_legal": "Lei 8.159/91"},
+        )
+        assert patch_rule.status_code == 200
+        assert patch_rule.json()["prazo_dias"] == 730
+        assert patch_rule.json()["base_legal"] == "Lei 8.159/91"
 
         create_hold = client.post(
             "/api/v1/ttd/holds",
@@ -869,6 +953,64 @@ def test_ttd_regras_holds_fluxo_basico() -> None:
         revoke_hold = client.patch(f"/api/v1/ttd/holds/{hold_id}/revogar")
         assert revoke_hold.status_code == 200
         assert revoke_hold.json()["status"] == "revogado"
+
+        delete_rule = client.delete(f"/api/v1/ttd/regras/{regra_id}")
+        assert delete_rule.status_code == 204
+
+        list_rules_after_delete = client.get("/api/v1/ttd/regras")
+        assert list_rules_after_delete.status_code == 200
+        assert len(list_rules_after_delete.json()) == 0
+
+
+def test_ttd_delete_regra_bloqueada_por_hold_ativo() -> None:
+    session = FakeAsyncSession()
+    app = build_test_app(ttd.router, "/api/v1/ttd", session)
+
+    nivel = PcdNivel(
+        id=uuid.uuid4(),
+        pai_id=None,
+        tipo="classe",
+        codigo="C-HOLD",
+        titulo="Classe sob hold",
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+        filhos=[],
+    )
+    session.add(nivel)
+
+    with TestClient(app) as client:
+        create_rule = client.post(
+            "/api/v1/ttd/regras",
+            json={
+                "pcd_nivel_id": str(nivel.id),
+                "evento_inicio": "rescisao",
+                "prazo_dias": 120,
+                "fase_corrente": 0,
+                "fase_intermediaria": 0,
+                "destinacao_final": "eliminacao",
+                "base_legal": None,
+                "legislacao_ref": None,
+                "observacoes": None,
+            },
+        )
+        assert create_rule.status_code == 201
+        regra_id = create_rule.json()["id"]
+
+        create_hold = client.post(
+            "/api/v1/ttd/holds",
+            json={
+                "pcd_nivel_id": str(nivel.id),
+                "motivo": "Litígio ativo",
+                "tipo": "litigio",
+                "data_expiracao": None,
+                "evidencia": None,
+            },
+        )
+        assert create_hold.status_code == 201
+
+        delete_rule = client.delete(f"/api/v1/ttd/regras/{regra_id}")
+        assert delete_rule.status_code == 400
+        assert "hold ativo" in delete_rule.json()["detail"].lower()
 
 
 def test_ttd_ordens_fluxo_aprovacao_assinatura() -> None:
@@ -1093,6 +1235,39 @@ def test_ciclo_vida_workflow_jobs() -> None:
         assert list_jobs.status_code == 200
         assert len(list_jobs.json()) == 1
 
+        job_cancelavel = client.post(
+            "/api/v1/ciclo-vida/jobs",
+            json={
+                "janela_inicio": datetime(2026, 4, 1, 0, 0, tzinfo=UTC).isoformat(),
+                "janela_fim": datetime(2026, 4, 30, 23, 59, tzinfo=UTC).isoformat(),
+            },
+        )
+        assert job_cancelavel.status_code == 201
+        job_cancelavel_id = job_cancelavel.json()["id"]
+
+        cancelado = client.patch(f"/api/v1/ciclo-vida/jobs/{job_cancelavel_id}/cancelar")
+        assert cancelado.status_code == 200
+        assert cancelado.json()["status"] == "cancelado"
+
+        excluido = client.delete(f"/api/v1/ciclo-vida/jobs/{job_cancelavel_id}")
+        assert excluido.status_code == 204
+
+        selo_rascunho = SeloEvidencia(
+            id=uuid.uuid4(),
+            entidade="job_retencao",
+            entidade_id=uuid.UUID(job_id),
+            razao="rascunho de teste",
+            criado_por=uuid.uuid4(),
+            hash_selo="a" * 64,
+            carimbo_tempo=datetime.now(UTC),
+            metadados={"status_selo": "rascunho"},
+            created_at=datetime.now(UTC),
+        )
+        session.add(selo_rascunho)
+
+        delete_selo = client.delete(f"/api/v1/ciclo-vida/selos/{selo_rascunho.id}")
+        assert delete_selo.status_code == 204
+
 
 def test_governanca_matriz_logs_integridade() -> None:
     session = FakeAsyncSession()
@@ -1155,14 +1330,30 @@ def test_governanca_matriz_logs_integridade() -> None:
             },
         )
         assert create_matriz.status_code == 201
+        entrada_id = create_matriz.json()["id"]
+
+        atualizar_matriz = client.patch(
+            f"/api/v1/governanca/matriz/{entrada_id}",
+            json={"risco": "alto", "evidencia": "Parecer interno"},
+        )
+        assert atualizar_matriz.status_code == 200
+        assert atualizar_matriz.json()["risco"] == "alto"
+        assert atualizar_matriz.json()["evidencia"] == "Parecer interno"
 
         list_matriz = client.get("/api/v1/governanca/matriz")
         assert list_matriz.status_code == 200
         assert len(list_matriz.json()) == 1
 
+        excluir_matriz = client.delete(f"/api/v1/governanca/matriz/{entrada_id}")
+        assert excluir_matriz.status_code == 204
+
+        list_matriz_pos_delete = client.get("/api/v1/governanca/matriz")
+        assert list_matriz_pos_delete.status_code == 200
+        assert len(list_matriz_pos_delete.json()) == 0
+
         list_logs = client.get("/api/v1/governanca/logs")
         assert list_logs.status_code == 200
-        assert len(list_logs.json()) == 2
+        assert len(list_logs.json()) == 5
 
         integridade = client.get("/api/v1/governanca/logs/verificar-integridade")
         assert integridade.status_code == 200
@@ -1236,6 +1427,30 @@ def test_integracao_importacao_acervo_csv() -> None:
         detalhe = client.get(f"/api/v1/integracao/importacoes/{body['id']}")
         assert detalhe.status_code == 200
         assert detalhe.json()["nome_arquivo"] == "inventario.csv"
+
+        reprocessar = client.post(f"/api/v1/integracao/importacoes/{body['id']}/reprocessar")
+        assert reprocessar.status_code == 201
+        assert reprocessar.json()["total_registros"] == 3
+
+        delete_com_sucesso = client.delete(f"/api/v1/integracao/importacoes/{body['id']}")
+        assert delete_com_sucesso.status_code == 400
+
+        falha = ImportacaoAcervo(
+            id=uuid.uuid4(),
+            nome_arquivo="falha.csv",
+            status="falha",
+            mapping=mapping,
+            total_registros=1,
+            total_sucesso=0,
+            total_erros=1,
+            resultados=[{"linha": 2, "status": "erro", "erros": ["linha inválida"]}],
+            observacoes="falha",
+            created_at=datetime.now(UTC),
+        )
+        session.add(falha)
+
+        delete_falha = client.delete(f"/api/v1/integracao/importacoes/{falha.id}")
+        assert delete_falha.status_code == 204
 
 
 def test_dados_migracao_inventario_qualidade_com_historico() -> None:
@@ -1321,6 +1536,18 @@ def test_dados_migracao_inventario_qualidade_com_historico() -> None:
             json={"nome": "Upper código", "tipo": "upper", "campo": "codigo", "configuracao": {}, "ativo": True},
         )
         assert regra_upper.status_code == 201
+        regra_upper_id = regra_upper.json()["id"]
+
+        obter_regra = client.get(f"/api/v1/dados-migracao/regras-cleansing/{regra_upper_id}")
+        assert obter_regra.status_code == 200
+        assert obter_regra.json()["nome"] == "Upper código"
+
+        atualizar_regra = client.patch(
+            f"/api/v1/dados-migracao/regras-cleansing/{regra_upper_id}",
+            json={"nome": "Upper código documental", "campo": "codigo"},
+        )
+        assert atualizar_regra.status_code == 200
+        assert atualizar_regra.json()["nome"] == "Upper código documental"
 
         regras = client.get("/api/v1/dados-migracao/regras-cleansing?ativo=true")
         assert regras.status_code == 200
@@ -1361,6 +1588,13 @@ def test_dados_migracao_inventario_qualidade_com_historico() -> None:
         detalhe = client.get(f"/api/v1/dados-migracao/inventarios/{second_body['id']}")
         assert detalhe.status_code == 200
         assert detalhe.json()["importacao_id"] == str(importacao.id)
+
+        excluir_regra = client.delete(f"/api/v1/dados-migracao/regras-cleansing/{regra_upper_id}")
+        assert excluir_regra.status_code == 204
+
+        regras_ativas = client.get("/api/v1/dados-migracao/regras-cleansing?ativo=true")
+        assert regras_ativas.status_code == 200
+        assert len(regras_ativas.json()) == 1
 
 
 def test_dados_migracao_planejamento_ondas_validacao_e_rollback() -> None:
@@ -1463,10 +1697,30 @@ def test_conhecimento_templates_e_trilhas_onboarding() -> None:
     app = build_test_app(conhecimento.router, "/api/v1/conhecimento", session)
 
     with TestClient(app) as client:
+        criar_template = client.post(
+            "/api/v1/conhecimento/templates",
+            json={
+                "titulo": "Template Operacional",
+                "categoria": "Operações",
+                "descricao": "Template criado via API",
+                "tags": ["operacao", "manual"],
+                "template_content": "# Operacional",
+                "guide_content": "# Guia",
+            },
+        )
+        assert criar_template.status_code == 201
+
         templates = client.get("/api/v1/conhecimento/templates?query=Termo de eliminação")
         assert templates.status_code == 200
         assert len(templates.json()) >= 1
         assert templates.json()[0]["slug"] == "termo-eliminacao"
+
+        update_template = client.patch(
+            "/api/v1/conhecimento/templates/termo-eliminacao",
+            json={"descricao": "Descrição atualizada"},
+        )
+        assert update_template.status_code == 200
+        assert update_template.json()["descricao"] == "Descrição atualizada"
 
         download_template = client.get("/api/v1/conhecimento/templates/termo-eliminacao/download?tipo=template")
         assert download_template.status_code == 200
@@ -1482,12 +1736,37 @@ def test_conhecimento_templates_e_trilhas_onboarding() -> None:
         assert len(trilhas.json()) >= 1
         trilha_id = trilhas.json()[0]["id"]
 
+        criar_trilha = client.post(
+            "/api/v1/conhecimento/trilhas",
+            json={
+                "nome": "Trilha de Teste",
+                "perfil": "Analista",
+                "duracao_estimada_min": 30,
+                "etapas": ["Etapa 1", "Etapa 2"],
+            },
+        )
+        assert criar_trilha.status_code == 201
+        nova_trilha_id = criar_trilha.json()["id"]
+
+        update_trilha = client.patch(
+            f"/api/v1/conhecimento/trilhas/{nova_trilha_id}",
+            json={"nome": "Trilha de Teste Atualizada"},
+        )
+        assert update_trilha.status_code == 200
+        assert update_trilha.json()["nome"] == "Trilha de Teste Atualizada"
+
         progresso = client.post(
             f"/api/v1/conhecimento/trilhas/{trilha_id}/progresso",
             json={"etapas_concluidas": len(trilhas.json()[0]["etapas"])},
         )
         assert progresso.status_code == 200
         assert progresso.json()["badge_emitido"] is True
+
+        delete_template = client.delete("/api/v1/conhecimento/templates/termo-eliminacao")
+        assert delete_template.status_code == 204
+
+        delete_trilha = client.delete(f"/api/v1/conhecimento/trilhas/{nova_trilha_id}")
+        assert delete_trilha.status_code == 204
 
 
 def test_roteiros_preview_assistido_pcd_ttd() -> None:
@@ -1602,6 +1881,11 @@ def test_admin_lgpd_protecao_e_anonimizacao() -> None:
         assert anonimizar.status_code == 200
         assert anonimizar.json()["anonimizado"] is True
         assert anonimizar.json()["campos_sensiveis"] == []
+
+        reset_senha = client.post(f"/api/v1/admin/usuarios/{titular.id}/reset-senha")
+        assert reset_senha.status_code == 200
+        assert reset_senha.json()["force_password_change"] is True
+        assert reset_senha.json()["senha_temporaria"].startswith("Tmp-")
 
 
 def test_observabilidade_metrics_summary_com_incidente() -> None:

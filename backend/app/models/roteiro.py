@@ -90,8 +90,10 @@ class Entrevista(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     roteiro_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("roteiros.id"))
     entrevistador_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
-    status: Mapped[str] = mapped_column(String(20), default="em_andamento")  # em_andamento, concluida, cancelada
+    cliente_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="em_andamento")  # em_andamento, submetida, devolvida, concluida, cancelada
     respostas: Mapped[dict] = mapped_column(JSONB, default=dict)
+    motivo_devolucao: Mapped[str | None] = mapped_column(Text)
     sugestao_classe: Mapped[str | None] = mapped_column(String(100))
     sugestao_justificativa: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

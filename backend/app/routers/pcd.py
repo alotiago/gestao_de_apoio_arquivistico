@@ -311,7 +311,7 @@ async def criar_nivel(
     )
     db.add(nivel)
     await db.flush()
-    await db.refresh(nivel)
+    await db.refresh(nivel, attribute_names=["filhos"])
     return nivel
 
 
@@ -350,7 +350,7 @@ async def atualizar_nivel(
         setattr(nivel, field, value)
 
     await db.flush()
-    await db.refresh(nivel)
+    await db.refresh(nivel, attribute_names=["filhos"])
     return nivel
 
 

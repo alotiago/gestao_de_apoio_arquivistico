@@ -38,6 +38,14 @@ class RegraCleansingResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class RegraCleansingUpdate(BaseModel):
+    nome: str | None = None
+    tipo: str | None = None
+    campo: str | None = None
+    configuracao: dict | None = None
+    ativo: bool | None = None
+
+
 class InventarioScanRequest(BaseModel):
     importacao_id: uuid.UUID
     regra_ids: list[uuid.UUID] = Field(default_factory=list)
@@ -250,6 +258,67 @@ async def criar_regra_cleansing(
     await db.flush()
     await db.refresh(regra)
     return regra
+
+
+@router.get("/regras-cleansing/{regra_id}", response_model=RegraCleansingResponse)
+async def obter_regra_cleansing(
+    regra_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Obter regra de cleansing por ID."""
+    regra = await db.get(RegraCleansing, regra_id)
+    if not regra:
+        raise HTTPException(status_code=404, detail="Regra de cleansing não encontrada")
+    return regra
+
+
+@router.patch("/regras-cleansing/{regra_id}", response_model=RegraCleansingResponse)
+async def atualizar_regra_cleansing(
+    regra_id: uuid.UUID,
+    data: RegraCleansingUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Atualizar regra operacional de cleansing (US-080)."""
+    regra = await db.get(RegraCleansing, regra_id)
+    if not regra:
+        raise HTTPException(status_code=404, detail="Regra de cleansing não encontrada")
+
+    changes = data.model_dump(exclude_unset=True)
+    if not changes:
+        raise HTTPException(status_code=400, detail="Nenhuma alteração enviada")
+
+    if "tipo" in changes:
+        tipos_suportados = {"trim", "collapse_spaces", "upper", "title_case"}
+        if changes["tipo"] not in tipos_suportados:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Tipo de regra inválido. Tipos suportados: {sorted(tipos_suportados)}",
+            )
+
+    for field, value in changes.items():
+        setattr(regra, field, value)
+
+    await db.flush()
+    await db.refresh(regra)
+    return regra
+
+
+@router.delete("/regras-cleansing/{regra_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def excluir_regra_cleansing(
+    regra_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Desativar regra de cleansing (soft-delete)."""
+    regra = await db.get(RegraCleansing, regra_id)
+    if not regra:
+        raise HTTPException(status_code=404, detail="Regra de cleansing não encontrada")
+
+    regra.ativo = False
+    await db.flush()
+    return None
 
 
 @router.get("/inventarios", response_model=list[InventarioQualidadeResponse])

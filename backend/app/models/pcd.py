@@ -20,7 +20,7 @@ class PcdNivel(Base):
     pai_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("pcd_niveis.id"), nullable=True, index=True
     )
-    tipo: Mapped[str] = mapped_column(String(20), nullable=False)  # funcao, atividade, serie, classe
+    tipo: Mapped[str] = mapped_column(String(20), nullable=False)  # funcao, subfuncao, atividade, serie, classe, tipo_documental
     codigo: Mapped[str] = mapped_column(String(50), nullable=False, unique=True, index=True)
     titulo: Mapped[str] = mapped_column(String(200), nullable=False)
     descricao: Mapped[str | None] = mapped_column(Text)

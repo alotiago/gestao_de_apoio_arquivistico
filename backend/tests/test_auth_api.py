@@ -10,7 +10,7 @@ from app.config import get_settings
 from app.database import get_db
 from app.models.user import User
 from app.routers import auth
-from app.routers.auth import create_access_token, create_refresh_token
+from app.routers.auth import create_access_token, create_refresh_token, get_password_hash
 
 
 class FakeExecuteResult:
@@ -49,6 +49,9 @@ class FakeAsyncSession:
 
         return FakeExecuteResult(None)
 
+    async def flush(self) -> None:
+        return None
+
 
 def build_test_app(session: FakeAsyncSession) -> FastAPI:
     app = FastAPI()
@@ -66,7 +69,7 @@ def build_user() -> User:
         id=uuid.uuid4(),
         email="usuario@example.com",
         nome="Usuario",
-        hashed_password="hash",
+        hashed_password=get_password_hash("SenhaAntiga1"),
         role="admin",
         is_active=True,
         atributos={},
@@ -147,3 +150,21 @@ def test_me_rejeita_refresh_token() -> None:
 
     assert response.status_code == 401
     assert response.json()["detail"] == "Credenciais inválidas"
+
+
+def test_me_altera_senha_com_regra_minima() -> None:
+    session = FakeAsyncSession()
+    user = build_user()
+    session.users[user.id] = user
+    app = build_test_app(session)
+
+    access_token = create_access_token({"sub": str(user.id), "email": user.email, "role": user.role})
+
+    with TestClient(app) as client:
+        response = client.patch(
+            "/api/v1/auth/me/senha",
+            json={"senha_atual": "SenhaAntiga1", "nova_senha": "NovaSenha2"},
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+
+    assert response.status_code == 204

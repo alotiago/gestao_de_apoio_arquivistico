@@ -62,6 +62,8 @@ httpx==0.28.1
 orjson==3.10.14
 python-dateutil==2.9.0
 Jinja2==3.1.5
+openpyxl==3.1.5
+fpdf2==2.8.7
 
 # ============================================
 # Development & Testing

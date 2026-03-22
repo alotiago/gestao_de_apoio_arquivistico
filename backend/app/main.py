@@ -16,7 +16,10 @@ from app.config import get_settings
 from app.middlewares.observability import ObservabilityMiddleware
 from app.middlewares.rate_limit import InMemoryRateLimitMiddleware
 from app.middlewares.security_headers import SecurityHeadersMiddleware
-from app.routers import auth, roteiros, pcd, ttd, ciclo_vida, governanca, admin, health, integracao, dados_migracao, conhecimento
+from fastapi import Depends
+
+from app.routers import auth, roteiros, pcd, ttd, ciclo_vida, governanca, admin, health, integracao, dados_migracao, conhecimento, portal, relatorios
+from app.routers.auth import require_internal
 
 settings = get_settings()
 
@@ -110,14 +113,18 @@ async def swagger_ui_redirect() -> HTMLResponse:
         return get_swagger_ui_oauth2_redirect_html()
 
 # ===== Routers =====
+_internal = [Depends(require_internal)]
+
 app.include_router(health.router, tags=["Health"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Autenticação"])
-app.include_router(roteiros.router, prefix="/api/v1/roteiros", tags=["EP1 — Roteiros"])
-app.include_router(pcd.router, prefix="/api/v1/pcd", tags=["EP2 — PCD"])
-app.include_router(ttd.router, prefix="/api/v1/ttd", tags=["EP3 — TTD"])
-app.include_router(ciclo_vida.router, prefix="/api/v1/ciclo-vida", tags=["EP4 — Ciclo de Vida"])
-app.include_router(governanca.router, prefix="/api/v1/governanca", tags=["EP5 — Governança"])
-app.include_router(integracao.router, prefix="/api/v1/integracao", tags=["EP6 — Integração"])
-app.include_router(dados_migracao.router, prefix="/api/v1/dados-migracao", tags=["EP9 — Dados e Migração"])
-app.include_router(conhecimento.router, prefix="/api/v1/conhecimento", tags=["EP10 — Conhecimento"])
-app.include_router(admin.router, prefix="/api/v1/admin", tags=["Administração"])
+app.include_router(roteiros.router, prefix="/api/v1/roteiros", tags=["EP1 — Roteiros"], dependencies=_internal)
+app.include_router(pcd.router, prefix="/api/v1/pcd", tags=["EP2 — PCD"], dependencies=_internal)
+app.include_router(ttd.router, prefix="/api/v1/ttd", tags=["EP3 — TTD"], dependencies=_internal)
+app.include_router(ciclo_vida.router, prefix="/api/v1/ciclo-vida", tags=["EP4 — Ciclo de Vida"], dependencies=_internal)
+app.include_router(governanca.router, prefix="/api/v1/governanca", tags=["EP5 — Governança"], dependencies=_internal)
+app.include_router(integracao.router, prefix="/api/v1/integracao", tags=["EP6 — Integração"], dependencies=_internal)
+app.include_router(dados_migracao.router, prefix="/api/v1/dados-migracao", tags=["EP9 — Dados e Migração"], dependencies=_internal)
+app.include_router(conhecimento.router, prefix="/api/v1/conhecimento", tags=["EP10 — Conhecimento"], dependencies=_internal)
+app.include_router(admin.router, prefix="/api/v1/admin", tags=["Administração"], dependencies=_internal)
+app.include_router(relatorios.router, prefix="/api/v1/relatorios", tags=["Relatórios e Exportação"], dependencies=_internal)
+app.include_router(portal.router, prefix="/api/v1/portal", tags=["Portal do Cliente"])

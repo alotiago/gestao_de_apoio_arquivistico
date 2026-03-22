@@ -426,6 +426,49 @@ async def executar_job_retencao(
     return job
 
 
+@router.patch("/jobs/{job_id}/cancelar", response_model=JobRetencaoResponse)
+async def cancelar_job_retencao(
+    job_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Cancelar job agendado antes da execução."""
+    job = await db.get(JobRetencao, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job não encontrado")
+    if job.status != "agendado":
+        raise HTTPException(status_code=400, detail="Somente jobs agendados podem ser cancelados")
+
+    job.status = "cancelado"
+    _registrar_log_job(
+        job,
+        status_execucao="cancelado",
+        mensagem="Job cancelado manualmente",
+        ordens_geradas=0,
+    )
+    await db.flush()
+    await db.refresh(job)
+    return job
+
+
+@router.delete("/jobs/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def excluir_job_retencao(
+    job_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Excluir job apenas quando não concluído/executado."""
+    job = await db.get(JobRetencao, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job não encontrado")
+    if job.status in {"executando", "concluido"}:
+        raise HTTPException(status_code=400, detail="Job concluído/em execução não pode ser excluído")
+
+    await db.delete(job)
+    await db.flush()
+    return None
+
+
 # ===== Endpoints — Selo de Evidência e Pacote =====
 
 @router.get("/selos", response_model=list[SeloEvidenciaResponse])
@@ -489,6 +532,26 @@ async def criar_selo_evidencia(
     await db.flush()
     await db.refresh(selo)
     return selo
+
+
+@router.delete("/selos/{selo_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def excluir_selo_evidencia(
+    selo_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Excluir selo apenas em rascunho; selos finalizados são imutáveis."""
+    selo = await db.get(SeloEvidencia, selo_id)
+    if not selo:
+        raise HTTPException(status_code=404, detail="Selo não encontrado")
+
+    status_selo = str((selo.metadados or {}).get("status_selo", "finalizado"))
+    if status_selo != "rascunho":
+        raise HTTPException(status_code=400, detail="Somente selos em rascunho podem ser excluídos")
+
+    await db.delete(selo)
+    await db.flush()
+    return None
 
 
 @router.get("/auditoria/pacote")

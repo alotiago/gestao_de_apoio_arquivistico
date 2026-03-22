@@ -64,6 +64,11 @@ class TokenData(BaseModel):
     role: str
 
 
+class AlterarSenhaRequest(BaseModel):
+    senha_atual: str
+    nova_senha: str
+
+
 # ===== Helpers =====
 
 def get_password_hash(password: str) -> str:
@@ -207,4 +212,47 @@ async def refresh_token(payload: RefreshTokenRequest, db: AsyncSession = Depends
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
     """Return authenticated user profile."""
+    return current_user
+
+
+@router.patch("/me/senha", status_code=status.HTTP_204_NO_CONTENT)
+async def alterar_senha(
+    data: AlterarSenhaRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Alterar senha do usuário autenticado."""
+    if not pwd_context.verify(data.senha_atual, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Senha atual inválida")
+
+    nova_senha = data.nova_senha
+    if len(nova_senha) < 8 or not any(c.isupper() for c in nova_senha) or not any(c.isdigit() for c in nova_senha):
+        raise HTTPException(status_code=400, detail="Nova senha deve conter ao menos 8 caracteres, 1 maiúscula e 1 número")
+
+    current_user.hashed_password = get_password_hash(nova_senha)
+    atributos = dict(current_user.atributos or {})
+    if atributos.get("force_password_change"):
+        atributos["force_password_change"] = False
+    current_user.atributos = atributos
+
+    await db.flush()
+    return None
+
+
+# ===== Role-based dependencies =====
+
+INTERNAL_ROLES = {"admin", "gestor", "analista", "arquivista", "classificador", "auditor", "viewer"}
+
+
+async def require_internal(current_user: User = Depends(get_current_user)) -> User:
+    """Rejeita usuários com role 'cliente' — uso em routers internos."""
+    if current_user.role not in INTERNAL_ROLES:
+        raise HTTPException(status_code=403, detail="Acesso restrito a usuários internos")
+    return current_user
+
+
+async def require_cliente(current_user: User = Depends(get_current_user)) -> User:
+    """Aceita apenas role 'cliente' — uso no portal externo."""
+    if current_user.role != "cliente":
+        raise HTTPException(status_code=403, detail="Endpoint exclusivo para clientes")
     return current_user

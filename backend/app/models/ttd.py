@@ -26,7 +26,7 @@ class RegraRetencao(Base):
     fase_intermediaria: Mapped[int] = mapped_column(Integer, default=0)  # anos na fase intermediária
     destinacao_final: Mapped[str] = mapped_column(
         String(30), nullable=False
-    )  # eliminacao, guarda_permanente, microfilmagem
+    )  # eliminacao, guarda_permanente, microfilmagem, amostragem
     base_legal: Mapped[str | None] = mapped_column(Text)
     legislacao_ref: Mapped[str | None] = mapped_column(String(200))
     observacoes: Mapped[str | None] = mapped_column(Text)

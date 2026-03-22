@@ -8,6 +8,7 @@ from app.models.ciclo_vida import JobRetencao, WorkflowTarefa
 from app.models.governanca import MatrizRastreabilidade, AuditLog
 from app.models.integracao import ImportacaoAcervo
 from app.models.dados_migracao import DependenciaMigracao, FaseMigracao, InventarioQualidade, OndaMigracao, RegraCleansing
+from app.models.conhecimento import TemplateConhecimento, TrilhaConhecimento, TrilhaProgresso
 
 __all__ = [
     "User",
@@ -18,4 +19,5 @@ __all__ = [
     "MatrizRastreabilidade", "AuditLog",
     "ImportacaoAcervo",
     "InventarioQualidade", "RegraCleansing", "OndaMigracao", "FaseMigracao", "DependenciaMigracao",
+    "TemplateConhecimento", "TrilhaConhecimento", "TrilhaProgresso",
 ]

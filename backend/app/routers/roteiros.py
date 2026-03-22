@@ -49,6 +49,17 @@ class PerguntaCreate(BaseModel):
     condicoes: list[CondicaoCreate] = []
 
 
+class PerguntaUpdate(BaseModel):
+    ordem: int | None = None
+    texto: str | None = None
+    tipo: str | None = None
+    obrigatoria: bool | None = None
+    secao: str | None = None
+    metadado_alvo: str | None = None
+    opcoes: dict | None = None
+    condicoes: list[CondicaoCreate] | None = None
+
+
 class RoteiroCreate(BaseModel):
     titulo: str
     descricao: str | None = None
@@ -157,14 +168,39 @@ class AssistentePreviewResponse(BaseModel):
 
 class EntrevistaCreateRequest(BaseModel):
     respostas: dict[str, object] = {}
+    cliente_id: uuid.UUID | None = None
+
+
+class EntrevistaUpdateRequest(BaseModel):
+    respostas: dict[str, object] | None = None
+    status: str | None = None
+    cliente_id: uuid.UUID | None = None
+    motivo_devolucao: str | None = None
+
+
+# Transições válidas: (status_atual, status_novo) -> set de roles que podem executar
+_INTERNAL = {"admin", "gestor", "arquivista", "classificador", "auditor", "viewer"}
+_CLIENT = {"cliente"}
+_STATUS_TRANSITIONS: dict[tuple[str, str], set[str]] = {
+    ("em_andamento", "submetida"): _CLIENT,
+    ("em_andamento", "concluida"): _INTERNAL,
+    ("em_andamento", "cancelada"): _INTERNAL,
+    ("submetida", "concluida"): _INTERNAL,
+    ("submetida", "devolvida"): _INTERNAL,
+    ("submetida", "cancelada"): _INTERNAL,
+    ("devolvida", "em_andamento"): _CLIENT,
+    ("devolvida", "submetida"): _CLIENT,
+}
 
 
 class EntrevistaResponse(BaseModel):
     id: uuid.UUID
     roteiro_id: uuid.UUID
     entrevistador_id: uuid.UUID | None
+    cliente_id: uuid.UUID | None = None
     status: str
     respostas: dict[str, object]
+    motivo_devolucao: str | None = None
     created_at: datetime
     completed_at: datetime | None
     model_config = {"from_attributes": True}
@@ -336,6 +372,78 @@ async def adicionar_pergunta(
     await db.flush()
     await db.refresh(pergunta, ["condicoes"])
     return pergunta
+
+
+@router.patch("/{roteiro_id}/perguntas/{pergunta_id}", response_model=PerguntaResponse)
+async def atualizar_pergunta(
+    roteiro_id: uuid.UUID,
+    pergunta_id: uuid.UUID,
+    data: PerguntaUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Atualizar pergunta existente de um roteiro."""
+    pergunta = await db.get(Pergunta, pergunta_id)
+    if not pergunta or pergunta.roteiro_id != roteiro_id:
+        raise HTTPException(status_code=404, detail="Pergunta não encontrada")
+
+    roteiro = await db.get(Roteiro, roteiro_id)
+    if not roteiro:
+        raise HTTPException(status_code=404, detail="Roteiro não encontrado")
+    if roteiro.status == "arquivado":
+        raise HTTPException(status_code=400, detail="Roteiro arquivado não pode ser editado")
+
+    changes = data.model_dump(exclude_unset=True)
+    if not changes:
+        raise HTTPException(status_code=400, detail="Nenhuma alteração enviada")
+
+    condicoes_payload = changes.pop("condicoes", None)
+    for field, value in changes.items():
+        setattr(pergunta, field, value)
+
+    if condicoes_payload is not None:
+        pergunta.condicoes.clear()
+        for item in condicoes_payload:
+            pergunta.condicoes.append(
+                Condicao(
+                    operador=item.operador,
+                    valor=item.valor,
+                    acao=item.acao,
+                    alvo_id=item.alvo_id,
+                )
+            )
+
+    await db.flush()
+    await db.refresh(pergunta, ["condicoes"])
+    return pergunta
+
+
+@router.delete("/{roteiro_id}/perguntas/{pergunta_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def excluir_pergunta(
+    roteiro_id: uuid.UUID,
+    pergunta_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Excluir pergunta de roteiro, bloqueando se houver entrevista em andamento."""
+    pergunta = await db.get(Pergunta, pergunta_id)
+    if not pergunta or pergunta.roteiro_id != roteiro_id:
+        raise HTTPException(status_code=404, detail="Pergunta não encontrada")
+
+    entrevistas_ativas = (
+        await db.execute(
+            select(Entrevista).where(
+                Entrevista.roteiro_id == roteiro_id,
+                Entrevista.status == "em_andamento",
+            )
+        )
+    ).scalars().all()
+    if entrevistas_ativas:
+        raise HTTPException(status_code=400, detail="Não é possível excluir pergunta com entrevista em andamento")
+
+    await db.delete(pergunta)
+    await db.flush()
+    return None
 
 
 @router.patch("/{roteiro_id}", response_model=RoteiroResponse)
@@ -548,9 +656,18 @@ async def iniciar_entrevista(
     if not roteiro:
         raise HTTPException(status_code=404, detail="Roteiro não encontrado")
 
+    cliente_id = data.cliente_id
+    if cliente_id is not None:
+        cliente = await db.get(User, cliente_id)
+        if not cliente or cliente.role != "cliente":
+            raise HTTPException(status_code=422, detail="Usuário informado não possui role cliente")
+        if not cliente.is_active:
+            raise HTTPException(status_code=422, detail="Usuário cliente está inativo")
+
     entrevista = Entrevista(
         roteiro_id=roteiro_id,
         entrevistador_id=current_user.id,
+        cliente_id=cliente_id,
         status="em_andamento",
         respostas=data.respostas,
         created_at=datetime.now(UTC),
@@ -559,6 +676,114 @@ async def iniciar_entrevista(
     await db.flush()
     await db.refresh(entrevista)
     return entrevista
+
+
+@router.get("/{roteiro_id}/entrevistas", response_model=list[EntrevistaResponse])
+async def listar_entrevistas_roteiro(
+    roteiro_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Listar entrevistas de um roteiro."""
+    roteiro = await db.get(Roteiro, roteiro_id)
+    if not roteiro:
+        raise HTTPException(status_code=404, detail="Roteiro não encontrado")
+
+    result = await db.execute(
+        select(Entrevista)
+        .where(Entrevista.roteiro_id == roteiro_id)
+        .order_by(Entrevista.created_at.desc())
+    )
+    return result.scalars().all()
+
+
+@router.get("/entrevistas/{entrevista_id}", response_model=EntrevistaResponse)
+async def obter_entrevista(
+    entrevista_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Obter entrevista por ID."""
+    entrevista = await db.get(Entrevista, entrevista_id)
+    if not entrevista:
+        raise HTTPException(status_code=404, detail="Entrevista não encontrada")
+    return entrevista
+
+
+@router.patch("/entrevistas/{entrevista_id}", response_model=EntrevistaResponse)
+async def atualizar_entrevista(
+    entrevista_id: uuid.UUID,
+    data: EntrevistaUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Atualizar respostas/status de entrevista."""
+    entrevista = await db.get(Entrevista, entrevista_id)
+    if not entrevista:
+        raise HTTPException(status_code=404, detail="Entrevista não encontrada")
+
+    changes = data.model_dump(exclude_unset=True)
+    if not changes:
+        raise HTTPException(status_code=400, detail="Nenhuma alteração enviada")
+
+    status_novo = changes.get("status")
+    valid_statuses = {"em_andamento", "submetida", "devolvida", "concluida", "cancelada"}
+    if status_novo is not None:
+        if status_novo not in valid_statuses:
+            raise HTTPException(status_code=400, detail="Status inválido para entrevista")
+        transition = (entrevista.status, status_novo)
+        allowed_roles = _STATUS_TRANSITIONS.get(transition)
+        if allowed_roles is None:
+            raise HTTPException(status_code=400, detail=f"Transição {entrevista.status} → {status_novo} não permitida")
+        if current_user.role not in allowed_roles:
+            raise HTTPException(status_code=403, detail="Seu papel não permite esta transição de status")
+        if status_novo == "devolvida":
+            motivo = changes.get("motivo_devolucao")
+            if not motivo or not str(motivo).strip():
+                raise HTTPException(status_code=422, detail="motivo_devolucao obrigatório ao devolver")
+
+    # Atribuir/reatribuir cliente (apenas internos)
+    novo_cliente_id = changes.get("cliente_id")
+    if novo_cliente_id is not None:
+        cliente = await db.get(User, novo_cliente_id)
+        if not cliente or cliente.role != "cliente":
+            raise HTTPException(status_code=422, detail="Usuário informado não possui role cliente")
+        if not cliente.is_active:
+            raise HTTPException(status_code=422, detail="Usuário cliente está inativo")
+        entrevista.cliente_id = novo_cliente_id
+
+    if "respostas" in changes and changes["respostas"] is not None:
+        entrevista.respostas = changes["respostas"]
+
+    if "motivo_devolucao" in changes:
+        entrevista.motivo_devolucao = changes["motivo_devolucao"]
+
+    if status_novo is not None:
+        entrevista.status = status_novo
+        if status_novo in {"concluida", "cancelada"}:
+            entrevista.completed_at = datetime.now(UTC)
+        else:
+            entrevista.completed_at = None
+
+    await db.flush()
+    await db.refresh(entrevista)
+    return entrevista
+
+
+@router.delete("/entrevistas/{entrevista_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def excluir_entrevista(
+    entrevista_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Excluir entrevista e suas evidências associadas."""
+    entrevista = await db.get(Entrevista, entrevista_id)
+    if not entrevista:
+        raise HTTPException(status_code=404, detail="Entrevista não encontrada")
+
+    await db.delete(entrevista)
+    await db.flush()
+    return None
 
 
 @router.get("/entrevistas/{entrevista_id}/evidencias", response_model=list[EvidenciaResponse])
@@ -656,6 +881,23 @@ async def upload_evidencia(
     await db.flush()
     await db.refresh(evidencia)
     return evidencia
+
+
+@router.delete("/entrevistas/{entrevista_id}/evidencias/{evidencia_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def excluir_evidencia(
+    entrevista_id: uuid.UUID,
+    evidencia_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Excluir evidência vinculada à entrevista."""
+    evidencia = await db.get(Evidencia, evidencia_id)
+    if not evidencia or evidencia.entrevista_id != entrevista_id:
+        raise HTTPException(status_code=404, detail="Evidência não encontrada")
+
+    await db.delete(evidencia)
+    await db.flush()
+    return None
 
 
 @router.get("/evidencias/{evidencia_id}/download")

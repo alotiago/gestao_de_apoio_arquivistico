@@ -49,6 +49,17 @@ class RegraRetencaoResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class RegraRetencaoUpdate(BaseModel):
+    evento_inicio: str | None = None
+    prazo_dias: int | None = None
+    fase_corrente: int | None = None
+    fase_intermediaria: int | None = None
+    destinacao_final: str | None = None
+    base_legal: str | None = None
+    legislacao_ref: str | None = None
+    observacoes: str | None = None
+
+
 class LegalHoldCreate(BaseModel):
     pcd_nivel_id: uuid.UUID
     motivo: str
@@ -136,6 +147,56 @@ async def obter_regra(
     if not regra:
         raise HTTPException(status_code=404, detail="Regra não encontrada")
     return regra
+
+
+@router.patch("/regras/{regra_id}", response_model=RegraRetencaoResponse)
+async def atualizar_regra(
+    regra_id: uuid.UUID,
+    data: RegraRetencaoUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Atualizar regra de retenção existente."""
+    regra = await db.get(RegraRetencao, regra_id)
+    if not regra:
+        raise HTTPException(status_code=404, detail="Regra não encontrada")
+
+    changes = data.model_dump(exclude_unset=True)
+    if not changes:
+        raise HTTPException(status_code=400, detail="Nenhuma alteração enviada")
+
+    for field, value in changes.items():
+        setattr(regra, field, value)
+
+    await db.flush()
+    await db.refresh(regra)
+    return regra
+
+
+@router.delete("/regras/{regra_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def excluir_regra(
+    regra_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Excluir regra de retenção sem hold ativo vinculado."""
+    regra = await db.get(RegraRetencao, regra_id)
+    if not regra:
+        raise HTTPException(status_code=404, detail="Regra não encontrada")
+
+    holds_result = await db.execute(
+        select(LegalHold).where(
+            LegalHold.pcd_nivel_id == regra.pcd_nivel_id,
+            LegalHold.status == "ativo",
+        )
+    )
+    holds_ativos = holds_result.scalars().all()
+    if holds_ativos:
+        raise HTTPException(status_code=400, detail="Não é possível excluir regra com hold ativo")
+
+    await db.delete(regra)
+    await db.flush()
+    return None
 
 
 # ===== Endpoints — Legal Holds =====

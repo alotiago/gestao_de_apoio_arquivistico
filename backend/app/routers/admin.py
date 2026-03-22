@@ -3,10 +3,12 @@ Router Admin — Gestão de usuários, papéis e configurações do sistema.
 """
 
 import uuid
+import secrets
+import string
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,7 +29,7 @@ class UserListResponse(BaseModel):
     role: str
     departamento: str | None
     unidade: str | None
-    ativo: bool
+    ativo: bool = Field(validation_alias="is_active")
     created_at: datetime
     model_config = {"from_attributes": True}
 
@@ -71,6 +73,12 @@ class LgpdResumoResponse(BaseModel):
     anonimizado: bool
     campos_sensiveis: list[str]
     dados_mascarados: dict[str, str]
+
+
+class ResetSenhaResponse(BaseModel):
+    user_id: uuid.UUID
+    senha_temporaria: str
+    force_password_change: bool
 
 
 # ===== Helpers =====
@@ -201,7 +209,11 @@ async def atualizar_usuario(
     if not user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
 
-    for field, value in data.model_dump(exclude_unset=True).items():
+    update_data = data.model_dump(exclude_unset=True)
+    # Mapeia campo do schema para campo do modelo
+    if "ativo" in update_data:
+        update_data["is_active"] = update_data.pop("ativo")
+    for field, value in update_data.items():
         setattr(user, field, value)
 
     await db.flush()
@@ -222,6 +234,32 @@ async def desativar_usuario(
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
     user.ativo = False
     await db.flush()
+
+
+@router.post("/usuarios/{user_id}/reset-senha", response_model=ResetSenhaResponse)
+async def resetar_senha_usuario(
+    user_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    """Resetar senha de usuário com credencial temporária."""
+    user = await db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+
+    caracteres = string.ascii_letters + string.digits
+    senha_temporaria = "Tmp-" + "".join(secrets.choice(caracteres) for _ in range(10))
+    user.hashed_password = get_password_hash(senha_temporaria)
+    atributos = dict(user.atributos or {})
+    atributos["force_password_change"] = True
+    user.atributos = atributos
+
+    await db.flush()
+    return ResetSenhaResponse(
+        user_id=user.id,
+        senha_temporaria=senha_temporaria,
+        force_password_change=True,
+    )
 
 
 @router.get("/stats")
