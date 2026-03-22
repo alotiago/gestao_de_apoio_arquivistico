@@ -229,6 +229,13 @@ class SugestaoClasseResponse(BaseModel):
     sugestao_justificativa: str
 
 
+class EntrevistasResumoResponse(BaseModel):
+    total: int
+    por_status: dict[str, int]
+    esta_semana: int
+    este_mes: int
+
+
 # ===== Endpoints =====
 
 @router.get("", response_model=PaginatedResponse)
@@ -695,6 +702,52 @@ async def listar_entrevistas_roteiro(
         .order_by(Entrevista.created_at.desc())
     )
     return result.scalars().all()
+
+
+@router.get("/entrevistas/resumo", response_model=EntrevistasResumoResponse)
+async def resumo_entrevistas(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Resumo agregado de todas as entrevistas: total, por status, última semana e último mês."""
+    from datetime import timedelta
+
+    agora = datetime.now(UTC)
+    inicio_semana = agora - timedelta(days=7)
+    inicio_mes = agora - timedelta(days=30)
+
+    todos_status = ["em_andamento", "submetida", "devolvida", "concluida", "cancelada"]
+
+    # contagem total
+    total_result = await db.execute(select(func.count()).select_from(Entrevista))
+    total = total_result.scalar() or 0
+
+    # contagem por status
+    por_status: dict[str, int] = {}
+    for st in todos_status:
+        r = await db.execute(
+            select(func.count()).select_from(Entrevista).where(Entrevista.status == st)
+        )
+        por_status[st] = r.scalar() or 0
+
+    # criadas na última semana
+    r_semana = await db.execute(
+        select(func.count()).select_from(Entrevista).where(Entrevista.created_at >= inicio_semana)
+    )
+    esta_semana = r_semana.scalar() or 0
+
+    # criadas no último mês
+    r_mes = await db.execute(
+        select(func.count()).select_from(Entrevista).where(Entrevista.created_at >= inicio_mes)
+    )
+    este_mes = r_mes.scalar() or 0
+
+    return EntrevistasResumoResponse(
+        total=total,
+        por_status=por_status,
+        esta_semana=esta_semana,
+        este_mes=este_mes,
+    )
 
 
 @router.get("/entrevistas/{entrevista_id}", response_model=EntrevistaResponse)

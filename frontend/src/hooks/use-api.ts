@@ -119,3 +119,7 @@ export function useStats() {
 export function useMetricsSummary() {
   return useDashboardSWR("/metrics/summary");
 }
+
+export function useEntrevistasResumo() {
+  return useDashboardSWR("/roteiros/entrevistas/resumo");
+}
