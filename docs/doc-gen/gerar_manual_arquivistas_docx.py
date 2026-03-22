@@ -1,0 +1,206 @@
+from datetime import datetime
+from docx import Document
+from docx.shared import Pt
+
+OUT = r"c:\des\gestao_de_apoio_arquivistico\docs\MANUAL_COMPLETO_ARQUIVISTAS.docx"
+
+
+def add_title(doc: Document, text: str) -> None:
+    p = doc.add_paragraph()
+    r = p.add_run(text)
+    r.bold = True
+    r.font.size = Pt(20)
+
+
+def add_h1(doc: Document, text: str) -> None:
+    doc.add_heading(text, level=1)
+
+
+def add_h2(doc: Document, text: str) -> None:
+    doc.add_heading(text, level=2)
+
+
+def add_p(doc: Document, text: str) -> None:
+    doc.add_paragraph(text)
+
+
+def add_bullets(doc: Document, items: list[str]) -> None:
+    for item in items:
+        doc.add_paragraph(item, style="List Bullet")
+
+
+def main() -> None:
+    doc = Document()
+
+    add_title(doc, "Manual Completo do Sistema - Gestao de Apoio Arquivistico")
+    add_p(doc, "Publico-alvo: Arquivistas, Gestores de Documentos, Classificadores e Auditores.")
+    add_p(doc, f"Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+
+    add_h1(doc, "1. Visao Geral")
+    add_p(doc, "O sistema organiza o ciclo documental de ponta a ponta: entrevistas, classificacao, temporalidade, governanca, integracao, migracao e rastreabilidade.")
+    add_bullets(doc, [
+        "Entrevistas assistidas para coleta e classificacao inicial.",
+        "PCD (Plano de Classificacao Documental) por niveis.",
+        "TTD (Tabela de Temporalidade) com regras, legal hold e ordens.",
+        "Governanca e trilha de auditoria com verificacao de integridade.",
+        "Integracao de acervo e dados de migracao (inventarios, cleansing e ondas).",
+        "Ciclo de vida com jobs de retencao e selos de evidencia.",
+        "Portal do cliente para resposta externa de entrevistas.",
+        "Relatorios e exportacoes PDF/CSV/Excel para operacao.",
+    ])
+
+    add_h1(doc, "2. Perfis e Acessos")
+    add_h2(doc, "2.1 Perfis Internos")
+    add_bullets(doc, [
+        "admin: administracao geral, usuarios e configuracoes.",
+        "gestor: supervisao operacional dos modulos.",
+        "arquivista/classificador: operacao principal de entrevistas, PCD e TTD.",
+        "auditor/viewer: consulta e auditoria com menor permissao.",
+    ])
+    add_h2(doc, "2.2 Perfil Cliente")
+    add_bullets(doc, [
+        "Acessa somente /portal e entrevistas atribuidas.",
+        "Pode editar respostas quando status = em_andamento ou devolvida.",
+        "Submete entrevista para analise interna (status submetida).",
+    ])
+
+    add_h1(doc, "3. Primeiros Passos")
+    add_h2(doc, "3.1 Acesso")
+    add_bullets(doc, [
+        "Tela de login em /login.",
+        "Usuarios internos sao direcionados para /dashboard.",
+        "Usuarios cliente sao direcionados para /portal.",
+    ])
+    add_h2(doc, "3.2 Troca de Senha")
+    add_bullets(doc, [
+        "No dashboard, acesse Perfil.",
+        "Informe senha atual, nova senha e confirmacao.",
+        "Regra minima: 8 caracteres, 1 letra maiuscula e 1 numero.",
+    ])
+
+    add_h1(doc, "4. Modulo Entrevistas")
+    add_h2(doc, "4.1 Fluxo Interno")
+    add_bullets(doc, [
+        "Criar roteiro (titulo, area, descricao).",
+        "Adicionar perguntas e condicoes de exibicao.",
+        "Iniciar entrevista e opcionalmente atribuir cliente.",
+        "Gerenciar status e evidencias por entrevista.",
+    ])
+    add_h2(doc, "4.2 Estados da Entrevista")
+    add_bullets(doc, [
+        "em_andamento: preenchimento ativo.",
+        "submetida: cliente finalizou e enviou para revisao.",
+        "devolvida: interno devolveu para ajuste com motivo.",
+        "concluida: validada e finalizada.",
+        "cancelada: encerrada sem conclusao.",
+    ])
+
+    add_h1(doc, "5. PCD - Plano de Classificacao")
+    add_bullets(doc, [
+        "Cadastra niveis hierarquicos: funcao, subfuncao, atividade, serie, classe e tipo_documental.",
+        "Cada nivel tem codigo unico, titulo e metadados de sigilo.",
+        "Permite versao e manutencao progressiva da arvore documental.",
+    ])
+
+    add_h1(doc, "6. TTD - Temporalidade")
+    add_bullets(doc, [
+        "Criar e atualizar regras de retencao por nivel do PCD.",
+        "Destinacoes: eliminacao, guarda_permanente, microfilmagem, amostragem.",
+        "Aplicar e revogar legal holds.",
+        "Emitir ordens de destinacao quando aplicavel.",
+    ])
+
+    add_h1(doc, "7. Governanca e Auditoria")
+    add_bullets(doc, [
+        "Matriz de rastreabilidade entre norma e classificacao documental.",
+        "CRUD da matriz com log de auditoria encadeado por hash.",
+        "Consulta de logs e verificacao de integridade.",
+    ])
+
+    add_h1(doc, "8. Integracao e Migracao")
+    add_h2(doc, "8.1 Integracao")
+    add_bullets(doc, [
+        "Importacao de acervo (CSV).",
+        "Reprocessamento de importacoes.",
+        "Exclusao logica de importacoes sem sucesso persistido.",
+    ])
+    add_h2(doc, "8.2 Dados e Migracao")
+    add_bullets(doc, [
+        "Regras de cleansing com CRUD.",
+        "Inventario de qualidade e indicadores.",
+        "Planejamento por ondas com validacao e rollback.",
+    ])
+
+    add_h1(doc, "9. Ciclo de Vida")
+    add_bullets(doc, [
+        "Criacao e execucao de jobs de retencao.",
+        "Cancelamento/exclusao de jobs conforme status.",
+        "Selos de evidencia e pacote de auditoria.",
+        "Exclusao de selo apenas em rascunho.",
+    ])
+
+    add_h1(doc, "10. Conhecimento")
+    add_bullets(doc, [
+        "Templates e guias com persistencia em banco.",
+        "CRUD de templates e trilhas de onboarding.",
+        "Controle de progresso por usuario.",
+    ])
+
+    add_h1(doc, "11. Relatorios e Exportacoes")
+    add_bullets(doc, [
+        "Busca avancada no PCD.",
+        "Dashboard de temporalidade.",
+        "Exportacao de CCD/TTD em PDF, CSV e Excel.",
+        "Termo de eliminacao e relatorio de transferencia/recolhimento (inclusive PDF).",
+        "Importacao em lote via Excel para aceleracao de cadastro.",
+    ])
+
+    add_h1(doc, "12. Portal do Cliente")
+    add_bullets(doc, [
+        "Lista entrevistas atribuidas ao cliente autenticado.",
+        "Edicao de respostas e evidencias no escopo permitido.",
+        "Submissao e acompanhamento de status.",
+        "Bloqueio automatico de acesso do cliente aos modulos internos.",
+    ])
+
+    add_h1(doc, "13. Operacao Local (Docker)")
+    add_bullets(doc, [
+        "Subida: docker compose up -d --build",
+        "Status: docker compose ps",
+        "Logs: docker compose logs backend/frontend/celery-worker --tail 200",
+        "Health backend: GET /health na porta 8000",
+        "Frontend: porta 4000 (primeira compilacao pode demorar)",
+    ])
+
+    add_h1(doc, "14. Troubleshooting")
+    add_h2(doc, "14.1 Frontend lento ao iniciar")
+    add_p(doc, "Causa comum: primeira compilacao do Next.js em modo desenvolvimento. Aguarde a mensagem 'Ready' no log do frontend antes do primeiro acesso.")
+    add_h2(doc, "14.2 Celery warning de root")
+    add_p(doc, "Causa: worker executado com usuario root no container de desenvolvimento. Nao bloqueia operacao local, mas recomenda-se ajustar user no Dockerfile/compose para hardening de producao.")
+    add_h2(doc, "14.3 Endpoint /api/v1/health")
+    add_p(doc, "No backend atual o health padrao exposto esta em /health.")
+
+    add_h1(doc, "15. Boas Praticas para Arquivistas")
+    add_bullets(doc, [
+        "Padronizar codigos e nomenclaturas no PCD antes de criar regras no TTD.",
+        "Registrar base legal de cada regra de retencao.",
+        "Usar devolucao com motivo claro e objetivo para orientar clientes.",
+        "Anexar evidencias e revisar logs de auditoria em processos criticos.",
+        "Validar relatorios periodicamente para detectar gargalos.",
+    ])
+
+    add_h1(doc, "16. Anexo - Checklist Operacional Diario")
+    add_bullets(doc, [
+        "Verificar /health no inicio do expediente.",
+        "Checar jobs de retencao agendados e pendencias.",
+        "Acompanhar entrevistas devolvidas/submetidas.",
+        "Monitorar integracoes com erro e acionar reprocessamento.",
+        "Emitir relatorios de apoio para controle gerencial.",
+    ])
+
+    doc.save(OUT)
+    print(f"Manual gerado em: {OUT}")
+
+
+if __name__ == "__main__":
+    main()
