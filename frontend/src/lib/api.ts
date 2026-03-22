@@ -1,4 +1,5 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
+import { clearAuthCookies } from "@/lib/auth-cookies";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
@@ -28,6 +29,7 @@ function clearAuthAndRedirectToLogin(): void {
 
   localStorage.removeItem("access_token");
   localStorage.removeItem("refresh_token");
+  clearAuthCookies();
 
   if (window.location.pathname !== "/login") {
     window.location.href = "/login";

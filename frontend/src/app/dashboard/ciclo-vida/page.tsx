@@ -82,6 +82,7 @@ export default function CicloVidaPage() {
   const [seloEntidadeId, setSeloEntidadeId] = useState("");
   const [seloRazao, setSeloRazao] = useState("");
   const [seloHashGerado, setSeloHashGerado] = useState<string | null>(null);
+  const [seloIdParaExcluir, setSeloIdParaExcluir] = useState("");
   const [pacoteAuditoria, setPacoteAuditoria] = useState<PacoteAuditoria | null>(null);
   const [seloLoading, setSeloLoading] = useState(false);
   const [pacoteLoading, setPacoteLoading] = useState(false);
@@ -129,6 +130,35 @@ export default function CicloVidaPage() {
       await mutateJobs();
     } catch {
       setErrorMessage("Falha ao executar/reprocessar job de retenção.");
+    } finally {
+      setJobLoadingId(null);
+    }
+  }
+
+  async function handleCancelarJob(jobId: string) {
+    setErrorMessage(null);
+    setJobLoadingId(jobId);
+    try {
+      await api.patch(`/ciclo-vida/jobs/${jobId}/cancelar`);
+      await mutateJobs();
+    } catch {
+      setErrorMessage("Falha ao cancelar job de retenção.");
+    } finally {
+      setJobLoadingId(null);
+    }
+  }
+
+  async function handleExcluirJob(jobId: string) {
+    if (!confirm("Deseja excluir este job?")) {
+      return;
+    }
+    setErrorMessage(null);
+    setJobLoadingId(jobId);
+    try {
+      await api.delete(`/ciclo-vida/jobs/${jobId}`);
+      await mutateJobs();
+    } catch {
+      setErrorMessage("Falha ao excluir job de retenção.");
     } finally {
       setJobLoadingId(null);
     }
@@ -188,6 +218,26 @@ export default function CicloVidaPage() {
       setErrorMessage("Falha ao consultar pacote de auditoria.");
     } finally {
       setPacoteLoading(false);
+    }
+  }
+
+  async function handleExcluirSelo() {
+    if (!seloIdParaExcluir.trim()) {
+      setErrorMessage("Informe o ID do selo para exclusão.");
+      return;
+    }
+    if (!confirm("Deseja excluir este selo?")) {
+      return;
+    }
+    setErrorMessage(null);
+    setSeloLoading(true);
+    try {
+      await api.delete(`/ciclo-vida/selos/${seloIdParaExcluir}`);
+      setSeloIdParaExcluir("");
+    } catch {
+      setErrorMessage("Falha ao excluir selo. Apenas rascunhos podem ser excluídos.");
+    } finally {
+      setSeloLoading(false);
     }
   }
 
@@ -350,6 +400,28 @@ export default function CicloVidaPage() {
                         ? "Reprocessar (idempotente)"
                         : "Executar"}
                   </Button>
+                  {job.status === "agendado" ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleCancelarJob(job.id)}
+                      disabled={jobLoadingId === job.id}
+                    >
+                      {jobLoadingId === job.id ? "Processando..." : "Cancelar"}
+                    </Button>
+                  ) : null}
+                  {job.status !== "concluido" && job.status !== "executando" ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleExcluirJob(job.id)}
+                      disabled={jobLoadingId === job.id}
+                    >
+                      {jobLoadingId === job.id ? "Processando..." : "Excluir"}
+                    </Button>
+                  ) : null}
                 </div>
               </div>
             ))}
@@ -391,12 +463,22 @@ export default function CicloVidaPage() {
             />
           </div>
 
+          <input
+            value={seloIdParaExcluir}
+            onChange={(event) => setSeloIdParaExcluir(event.target.value)}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            placeholder="ID do selo para excluir (somente rascunho)"
+          />
+
           <div className="flex flex-wrap gap-2">
             <Button type="button" size="sm" onClick={handleGerarSelo} disabled={seloLoading}>
               {seloLoading ? "Gerando selo..." : "Gerar Selo"}
             </Button>
             <Button type="button" size="sm" variant="outline" onClick={handleConsultarPacote} disabled={pacoteLoading}>
               {pacoteLoading ? "Consultando..." : "Consultar Pacote"}
+            </Button>
+            <Button type="button" size="sm" variant="outline" onClick={handleExcluirSelo} disabled={seloLoading}>
+              {seloLoading ? "Excluindo selo..." : "Excluir Selo"}
             </Button>
           </div>
 

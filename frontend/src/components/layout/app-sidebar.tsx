@@ -14,6 +14,8 @@ import {
   Settings,
   BookOpen,
   PlugZap,
+  User,
+  FileBarChart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -26,10 +28,12 @@ const navigation = [
   { name: "Governança", href: "/dashboard/governanca", icon: Shield },
   { name: "Integração", href: "/dashboard/integracao", icon: PlugZap },
   { name: "Dados & Migração", href: "/dashboard/dados-migracao", icon: Database },
+  { name: "Relatórios", href: "/dashboard/relatorios", icon: FileBarChart },
 ];
 
 const secondaryNav = [
   { name: "Base de Conhecimento", href: "/dashboard/conhecimento", icon: BookOpen },
+  { name: "Perfil", href: "/dashboard/perfil", icon: User },
   { name: "Administração", href: "/dashboard/admin", icon: Settings },
 ];
 
@@ -37,9 +41,9 @@ export function AppSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="flex w-64 flex-col border-r bg-background" aria-label="Navegação lateral">
+    <aside className="flex w-64 flex-col border-r border-secondary/20 bg-secondary text-secondary-foreground" aria-label="Navegação lateral">
       {/* Logo */}
-      <div className="flex h-16 items-center gap-3 border-b bg-secondary px-5">
+      <div className="flex h-16 items-center gap-3 border-b border-secondary-foreground/15 bg-secondary px-5">
         <Image
           src="/branding/hw1-logo-wht.svg"
           alt="HW1"
@@ -54,7 +58,7 @@ export function AppSidebar() {
 
       {/* Main Navigation */}
       <nav className="flex-1 space-y-1 px-3 py-4" aria-label="Menu principal">
-        <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-secondary-foreground/65">
           Módulos
         </p>
         {navigation.map((item) => {
@@ -69,8 +73,8 @@ export function AppSidebar() {
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                 isActive
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-secondary-foreground/80 hover:bg-secondary-foreground/10 hover:text-secondary-foreground"
               )}
             >
               <item.icon className="h-5 w-5" aria-hidden="true" />
@@ -79,9 +83,9 @@ export function AppSidebar() {
           );
         })}
 
-        <div className="my-4 border-t" />
+        <div className="my-4 border-t border-secondary-foreground/15" />
 
-        <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-secondary-foreground/65">
           Sistema
         </p>
         {secondaryNav.map((item) => {
@@ -94,8 +98,8 @@ export function AppSidebar() {
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                 isActive
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-secondary-foreground/80 hover:bg-secondary-foreground/10 hover:text-secondary-foreground"
               )}
             >
               <item.icon className="h-5 w-5" aria-hidden="true" />
@@ -106,8 +110,8 @@ export function AppSidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="border-t p-4">
-        <p className="text-xs text-muted-foreground text-center">v0.1.0 — Sprint 0</p>
+      <div className="border-t border-secondary-foreground/15 p-4">
+        <p className="text-xs text-secondary-foreground/65 text-center">v0.1.0 — Sprint 0</p>
       </div>
     </aside>
   );

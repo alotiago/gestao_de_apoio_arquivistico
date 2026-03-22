@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import type { AxiosError } from "axios";
 import api from "@/lib/api";
+import { setAuthCookies } from "@/lib/auth-cookies";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -32,6 +33,20 @@ export default function LoginPage() {
       localStorage.setItem("access_token", data.access_token);
       if (data.refresh_token) {
         localStorage.setItem("refresh_token", data.refresh_token);
+      }
+      // Salva também como cookie para middleware SSR
+      setAuthCookies(data.access_token, data.refresh_token);
+
+      // Redireciona por role: cliente → /portal, demais → /dashboard
+      try {
+        const parts = data.access_token.split(".");
+        const payload = JSON.parse(atob(parts[1]));
+        if (payload.role === "cliente") {
+          router.push("/portal");
+          return;
+        }
+      } catch {
+        // fallback para dashboard
       }
       router.push("/dashboard");
     } catch (err: unknown) {

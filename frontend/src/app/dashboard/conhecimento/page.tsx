@@ -37,10 +37,23 @@ type TrilhaConhecimento = {
 };
 
 export default function ConhecimentoPage() {
-  const [query, setQuery] = useState("Termo de eliminação");
+  const [query, setQuery] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
+  const [editingTemplateSlug, setEditingTemplateSlug] = useState<string | null>(null);
+  const [templateTitulo, setTemplateTitulo] = useState("");
+  const [templateCategoria, setTemplateCategoria] = useState("Geral");
+  const [templateDescricao, setTemplateDescricao] = useState("");
+  const [templateTags, setTemplateTags] = useState("");
+  const [templateContent, setTemplateContent] = useState("");
+  const [templateGuide, setTemplateGuide] = useState("");
+
+  const [editingTrilhaId, setEditingTrilhaId] = useState<string | null>(null);
+  const [trilhaNome, setTrilhaNome] = useState("");
+  const [trilhaPerfil, setTrilhaPerfil] = useState("Geral");
+  const [trilhaDuracao, setTrilhaDuracao] = useState(60);
+  const [trilhaEtapas, setTrilhaEtapas] = useState("");
 
   const { data: templatesRaw, mutate: mutateTemplates } = useTemplatesConhecimento(query);
   const { data: trilhasRaw, mutate: mutateTrilhas } = useTrilhasConhecimento();
@@ -99,6 +112,148 @@ export default function ConhecimentoPage() {
     setErrorMessage(null);
     setSuccessMessage(null);
     await mutateTemplates();
+  }
+
+  function fillTemplateForm(item: TemplateConhecimento) {
+    setEditingTemplateSlug(item.slug);
+    setTemplateTitulo(item.titulo);
+    setTemplateCategoria(item.categoria);
+    setTemplateDescricao(item.descricao);
+    setTemplateTags(item.tags.join(", "));
+    setTemplateContent("");
+    setTemplateGuide("");
+  }
+
+  function resetTemplateForm() {
+    setEditingTemplateSlug(null);
+    setTemplateTitulo("");
+    setTemplateCategoria("Geral");
+    setTemplateDescricao("");
+    setTemplateTags("");
+    setTemplateContent("");
+    setTemplateGuide("");
+  }
+
+  async function handleSalvarTemplate() {
+    if (!templateTitulo.trim() || !templateDescricao.trim()) {
+      setErrorMessage("Informe título e descrição para salvar o template.");
+      return;
+    }
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setLoadingAction("save-template");
+    try {
+      const payload = {
+        titulo: templateTitulo,
+        categoria: templateCategoria,
+        descricao: templateDescricao,
+        tags: templateTags.split(",").map((item) => item.trim()).filter(Boolean),
+        template_content: templateContent || "# Template",
+        guide_content: templateGuide || "# Guia",
+      };
+
+      if (editingTemplateSlug) {
+        await api.patch(`/conhecimento/templates/${editingTemplateSlug}`, payload);
+      } else {
+        await api.post("/conhecimento/templates", payload);
+      }
+
+      await mutateTemplates();
+      resetTemplateForm();
+      setSuccessMessage("Template salvo com sucesso.");
+    } catch {
+      setErrorMessage("Falha ao salvar template.");
+    } finally {
+      setLoadingAction(null);
+    }
+  }
+
+  async function handleExcluirTemplate(slug: string) {
+    if (!confirm("Deseja excluir este template?")) {
+      return;
+    }
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setLoadingAction(`delete-template-${slug}`);
+    try {
+      await api.delete(`/conhecimento/templates/${slug}`);
+      await mutateTemplates();
+      if (editingTemplateSlug === slug) {
+        resetTemplateForm();
+      }
+      setSuccessMessage("Template excluído com sucesso.");
+    } catch {
+      setErrorMessage("Falha ao excluir template.");
+    } finally {
+      setLoadingAction(null);
+    }
+  }
+
+  function fillTrilhaForm(item: TrilhaConhecimento) {
+    setEditingTrilhaId(item.id);
+    setTrilhaNome(item.nome);
+    setTrilhaPerfil(item.perfil);
+    setTrilhaDuracao(item.duracao_estimada_min);
+    setTrilhaEtapas(item.etapas.join("\n"));
+  }
+
+  function resetTrilhaForm() {
+    setEditingTrilhaId(null);
+    setTrilhaNome("");
+    setTrilhaPerfil("Geral");
+    setTrilhaDuracao(60);
+    setTrilhaEtapas("");
+  }
+
+  async function handleSalvarTrilha() {
+    if (!trilhaNome.trim()) {
+      setErrorMessage("Informe o nome da trilha.");
+      return;
+    }
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setLoadingAction("save-trilha");
+    try {
+      const payload = {
+        nome: trilhaNome,
+        perfil: trilhaPerfil,
+        duracao_estimada_min: trilhaDuracao,
+        etapas: trilhaEtapas.split("\n").map((item) => item.trim()).filter(Boolean),
+      };
+      if (editingTrilhaId) {
+        await api.patch(`/conhecimento/trilhas/${editingTrilhaId}`, payload);
+      } else {
+        await api.post("/conhecimento/trilhas", payload);
+      }
+      await mutateTrilhas();
+      resetTrilhaForm();
+      setSuccessMessage("Trilha salva com sucesso.");
+    } catch {
+      setErrorMessage("Falha ao salvar trilha.");
+    } finally {
+      setLoadingAction(null);
+    }
+  }
+
+  async function handleExcluirTrilha(trilhaId: string) {
+    if (!confirm("Deseja excluir esta trilha?")) {
+      return;
+    }
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setLoadingAction(`delete-trilha-${trilhaId}`);
+    try {
+      await api.delete(`/conhecimento/trilhas/${trilhaId}`);
+      await mutateTrilhas();
+      if (editingTrilhaId === trilhaId) {
+        resetTrilhaForm();
+      }
+      setSuccessMessage("Trilha excluída com sucesso.");
+    } catch {
+      setErrorMessage("Falha ao excluir trilha.");
+    } finally {
+      setLoadingAction(null);
+    }
   }
 
   return (
@@ -224,6 +379,146 @@ export default function ConhecimentoPage() {
           ))}
         </CardContent>
       </Card>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Gerenciar Templates</CardTitle>
+            <CardDescription>CRUD de templates e guias de conhecimento</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <input
+              value={templateTitulo}
+              onChange={(event) => setTemplateTitulo(event.target.value)}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              placeholder="Título do template"
+            />
+            <input
+              value={templateCategoria}
+              onChange={(event) => setTemplateCategoria(event.target.value)}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              placeholder="Categoria"
+            />
+            <textarea
+              value={templateDescricao}
+              onChange={(event) => setTemplateDescricao(event.target.value)}
+              className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              placeholder="Descrição"
+            />
+            <input
+              value={templateTags}
+              onChange={(event) => setTemplateTags(event.target.value)}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              placeholder="Tags separadas por vírgula"
+            />
+            <textarea
+              value={templateContent}
+              onChange={(event) => setTemplateContent(event.target.value)}
+              className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              placeholder="Conteúdo markdown do template"
+            />
+            <textarea
+              value={templateGuide}
+              onChange={(event) => setTemplateGuide(event.target.value)}
+              className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              placeholder="Conteúdo markdown do guia"
+            />
+            <div className="flex gap-2">
+              <Button type="button" onClick={handleSalvarTemplate} disabled={loadingAction !== null}>
+                {loadingAction === "save-template" ? "Salvando..." : editingTemplateSlug ? "Atualizar" : "Criar"}
+              </Button>
+              {editingTemplateSlug ? (
+                <Button type="button" variant="outline" onClick={resetTemplateForm} disabled={loadingAction !== null}>
+                  Cancelar
+                </Button>
+              ) : null}
+            </div>
+            <div className="space-y-2">
+              {templates.map((item) => (
+                <div key={item.slug} className="rounded-md border border-border p-2">
+                  <p className="text-sm font-medium text-foreground">{item.titulo}</p>
+                  <div className="mt-2 flex gap-2">
+                    <Button type="button" size="sm" variant="outline" onClick={() => fillTemplateForm(item)}>Editar</Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleExcluirTemplate(item.slug)}
+                      disabled={loadingAction === `delete-template-${item.slug}`}
+                    >
+                      {loadingAction === `delete-template-${item.slug}` ? "Excluindo..." : "Excluir"}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Gerenciar Trilhas</CardTitle>
+            <CardDescription>CRUD de trilhas e etapas de onboarding</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <input
+              value={trilhaNome}
+              onChange={(event) => setTrilhaNome(event.target.value)}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              placeholder="Nome da trilha"
+            />
+            <input
+              value={trilhaPerfil}
+              onChange={(event) => setTrilhaPerfil(event.target.value)}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              placeholder="Perfil alvo"
+            />
+            <input
+              type="number"
+              min={1}
+              value={trilhaDuracao}
+              onChange={(event) => setTrilhaDuracao(Number(event.target.value))}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              placeholder="Duração estimada (min)"
+            />
+            <textarea
+              value={trilhaEtapas}
+              onChange={(event) => setTrilhaEtapas(event.target.value)}
+              className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              placeholder="Etapas (uma por linha)"
+            />
+            <div className="flex gap-2">
+              <Button type="button" onClick={handleSalvarTrilha} disabled={loadingAction !== null}>
+                {loadingAction === "save-trilha" ? "Salvando..." : editingTrilhaId ? "Atualizar" : "Criar"}
+              </Button>
+              {editingTrilhaId ? (
+                <Button type="button" variant="outline" onClick={resetTrilhaForm} disabled={loadingAction !== null}>
+                  Cancelar
+                </Button>
+              ) : null}
+            </div>
+            <div className="space-y-2">
+              {trilhas.map((item) => (
+                <div key={item.id} className="rounded-md border border-border p-2">
+                  <p className="text-sm font-medium text-foreground">{item.nome}</p>
+                  <div className="mt-2 flex gap-2">
+                    <Button type="button" size="sm" variant="outline" onClick={() => fillTrilhaForm(item)}>Editar</Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleExcluirTrilha(item.id)}
+                      disabled={loadingAction === `delete-trilha-${item.id}`}
+                    >
+                      {loadingAction === `delete-trilha-${item.id}` ? "Excluindo..." : "Excluir"}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

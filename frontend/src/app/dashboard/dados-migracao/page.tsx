@@ -32,6 +32,7 @@ type RegraCleansing = {
   nome: string;
   tipo: string;
   campo?: string | null;
+  configuracao?: Record<string, unknown>;
   ativo: boolean;
   created_at: string;
 };
@@ -123,6 +124,7 @@ export default function DadosMigracaoPage() {
   const [nomeRegra, setNomeRegra] = useState("");
   const [tipoRegra, setTipoRegra] = useState("trim");
   const [campoRegra, setCampoRegra] = useState("");
+  const [editingRegraId, setEditingRegraId] = useState<string | null>(null);
   const [statusFiltroOnda, setStatusFiltroOnda] = useState("");
   const [nomeOnda, setNomeOnda] = useState("");
   const [unidadeOnda, setUnidadeOnda] = useState("");
@@ -204,19 +206,66 @@ export default function DadosMigracaoPage() {
     setSuccessMessage(null);
     setLoadingAction("regra");
     try {
-      await api.post("/dados-migracao/regras-cleansing", {
-        nome: nomeRegra,
-        tipo: tipoRegra,
-        campo: campoRegra.trim() || null,
-        configuracao: {},
-        ativo: true,
-      });
+      if (editingRegraId) {
+        await api.patch(`/dados-migracao/regras-cleansing/${editingRegraId}`, {
+          nome: nomeRegra,
+          tipo: tipoRegra,
+          campo: campoRegra.trim() || null,
+        });
+      } else {
+        await api.post("/dados-migracao/regras-cleansing", {
+          nome: nomeRegra,
+          tipo: tipoRegra,
+          campo: campoRegra.trim() || null,
+          configuracao: {},
+          ativo: true,
+        });
+      }
       setNomeRegra("");
+      setTipoRegra("trim");
       setCampoRegra("");
-      setSuccessMessage("Regra de cleansing cadastrada com sucesso.");
+      setEditingRegraId(null);
+      setSuccessMessage(editingRegraId ? "Regra de cleansing atualizada com sucesso." : "Regra de cleansing cadastrada com sucesso.");
       await mutateRegras();
     } catch {
-      setErrorMessage("Falha ao criar regra de cleansing.");
+      setErrorMessage(editingRegraId ? "Falha ao atualizar regra de cleansing." : "Falha ao criar regra de cleansing.");
+    } finally {
+      setLoadingAction(null);
+    }
+  }
+
+  function handleEditarRegra(regra: RegraCleansing) {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setEditingRegraId(regra.id);
+    setNomeRegra(regra.nome);
+    setTipoRegra(regra.tipo);
+    setCampoRegra(regra.campo ?? "");
+  }
+
+  function handleCancelarEdicaoRegra() {
+    setEditingRegraId(null);
+    setNomeRegra("");
+    setTipoRegra("trim");
+    setCampoRegra("");
+  }
+
+  async function handleDesativarRegra(regraId: string) {
+    if (!confirm("Deseja desativar esta regra de cleansing?")) {
+      return;
+    }
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setLoadingAction(`desativar-${regraId}`);
+    try {
+      await api.delete(`/dados-migracao/regras-cleansing/${regraId}`);
+      if (editingRegraId === regraId) {
+        handleCancelarEdicaoRegra();
+      }
+      setSuccessMessage("Regra de cleansing desativada.");
+      await mutateRegras();
+    } catch {
+      setErrorMessage("Falha ao desativar regra de cleansing.");
     } finally {
       setLoadingAction(null);
     }
@@ -377,17 +426,33 @@ export default function DadosMigracaoPage() {
                 </p>
               ) : (
                 regras.map((regra) => (
-                  <label key={regra.id} className="flex items-center gap-2 text-sm text-foreground">
-                    <input
-                      type="checkbox"
-                      checked={selectedRuleIds.includes(regra.id)}
-                      onChange={() => toggleRule(regra.id)}
-                    />
-                    <span>
-                      {regra.nome} · {regra.tipo}
-                      {regra.campo ? ` · campo ${regra.campo}` : " · todos os campos"}
-                    </span>
-                  </label>
+                  <div key={regra.id} className="rounded-md border border-border p-2">
+                    <label className="flex items-center gap-2 text-sm text-foreground">
+                      <input
+                        type="checkbox"
+                        checked={selectedRuleIds.includes(regra.id)}
+                        onChange={() => toggleRule(regra.id)}
+                      />
+                      <span>
+                        {regra.nome} · {regra.tipo}
+                        {regra.campo ? ` · campo ${regra.campo}` : " · todos os campos"}
+                      </span>
+                    </label>
+                    <div className="mt-2 flex gap-2">
+                      <Button type="button" size="sm" variant="outline" onClick={() => handleEditarRegra(regra)}>
+                        Editar
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDesativarRegra(regra.id)}
+                        disabled={loadingAction === `desativar-${regra.id}`}
+                      >
+                        {loadingAction === `desativar-${regra.id}` ? "Desativando..." : "Desativar"}
+                      </Button>
+                    </div>
+                  </div>
                 ))
               )}
             </div>
@@ -430,8 +495,13 @@ export default function DadosMigracaoPage() {
               placeholder="Campo alvo opcional (ex.: codigo)"
             />
             <Button type="button" variant="outline" onClick={handleCriarRegra} disabled={loadingAction !== null}>
-              {loadingAction === "regra" ? "Salvando..." : "Cadastrar regra"}
+              {loadingAction === "regra" ? "Salvando..." : editingRegraId ? "Atualizar regra" : "Cadastrar regra"}
             </Button>
+            {editingRegraId ? (
+              <Button type="button" variant="outline" onClick={handleCancelarEdicaoRegra} disabled={loadingAction !== null}>
+                Cancelar edição
+              </Button>
+            ) : null}
           </CardContent>
         </Card>
       </div>

@@ -74,6 +74,8 @@ function flattenPcdTree(nodes: PcdNivel[]): PcdNivel[] {
 export default function TtdPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [creatingRegra, setCreatingRegra] = useState(false);
+  const [editingRegraId, setEditingRegraId] = useState<string | null>(null);
+  const [deletingRegraId, setDeletingRegraId] = useState<string | null>(null);
   const [creatingHold, setCreatingHold] = useState(false);
   const [revogandoId, setRevogandoId] = useState<string | null>(null);
   const [creatingOrdem, setCreatingOrdem] = useState(false);
@@ -132,17 +134,27 @@ export default function TtdPage() {
     setErrorMessage(null);
     setCreatingRegra(true);
     try {
-      await api.post("/ttd/regras", {
-        pcd_nivel_id: regraPcdNivelId,
-        evento_inicio: eventoInicio,
-        prazo_dias: prazoDias,
-        fase_corrente: 0,
-        fase_intermediaria: 0,
-        destinacao_final: destinacaoFinal,
-        base_legal: baseLegal || null,
-        legislacao_ref: legislacaoRef || null,
-        observacoes: null,
-      });
+      if (editingRegraId) {
+        await api.patch(`/ttd/regras/${editingRegraId}`, {
+          evento_inicio: eventoInicio,
+          prazo_dias: prazoDias,
+          destinacao_final: destinacaoFinal,
+          base_legal: baseLegal || null,
+          legislacao_ref: legislacaoRef || null,
+        });
+      } else {
+        await api.post("/ttd/regras", {
+          pcd_nivel_id: regraPcdNivelId,
+          evento_inicio: eventoInicio,
+          prazo_dias: prazoDias,
+          fase_corrente: 0,
+          fase_intermediaria: 0,
+          destinacao_final: destinacaoFinal,
+          base_legal: baseLegal || null,
+          legislacao_ref: legislacaoRef || null,
+          observacoes: null,
+        });
+      }
 
       setRegraPcdNivelId("");
       setEventoInicio("fim_contrato");
@@ -150,11 +162,52 @@ export default function TtdPage() {
       setDestinacaoFinal("eliminacao");
       setBaseLegal("");
       setLegislacaoRef("");
+      setEditingRegraId(null);
       await mutateRegras();
     } catch {
-      setErrorMessage("Falha ao criar regra de retenção.");
+      setErrorMessage(editingRegraId ? "Falha ao atualizar regra de retenção." : "Falha ao criar regra de retenção.");
     } finally {
       setCreatingRegra(false);
+    }
+  }
+
+  function handleEditarRegra(regra: RegraRetencao) {
+    setErrorMessage(null);
+    setEditingRegraId(regra.id);
+    setRegraPcdNivelId(regra.pcd_nivel_id);
+    setEventoInicio(regra.evento_inicio);
+    setPrazoDias(regra.prazo_dias);
+    setDestinacaoFinal(regra.destinacao_final);
+    setBaseLegal(regra.base_legal ?? "");
+    setLegislacaoRef(regra.legislacao_ref ?? "");
+  }
+
+  function handleCancelarEdicaoRegra() {
+    setEditingRegraId(null);
+    setRegraPcdNivelId("");
+    setEventoInicio("fim_contrato");
+    setPrazoDias(365);
+    setDestinacaoFinal("eliminacao");
+    setBaseLegal("");
+    setLegislacaoRef("");
+  }
+
+  async function handleExcluirRegra(regraId: string) {
+    if (!confirm("Deseja excluir esta regra de retenção?")) {
+      return;
+    }
+    setErrorMessage(null);
+    setDeletingRegraId(regraId);
+    try {
+      await api.delete(`/ttd/regras/${regraId}`);
+      if (editingRegraId === regraId) {
+        handleCancelarEdicaoRegra();
+      }
+      await mutateRegras();
+    } catch {
+      setErrorMessage("Falha ao excluir regra de retenção. Verifique se há hold ativo vinculado.");
+    } finally {
+      setDeletingRegraId(null);
     }
   }
 
@@ -289,6 +342,7 @@ export default function TtdPage() {
                 required
                 value={regraPcdNivelId}
                 onChange={(event) => setRegraPcdNivelId(event.target.value)}
+                disabled={Boolean(editingRegraId)}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               >
                 <option value="">Nível do PCD</option>
@@ -323,6 +377,7 @@ export default function TtdPage() {
                 <option value="eliminacao">Eliminação</option>
                 <option value="guarda_permanente">Guarda Permanente</option>
                 <option value="microfilmagem">Microfilmagem</option>
+                <option value="amostragem">Amostragem</option>
               </select>
 
               <input
@@ -340,8 +395,13 @@ export default function TtdPage() {
               />
 
               <Button type="submit" className="w-full" disabled={creatingRegra}>
-                {creatingRegra ? "Salvando..." : "Criar regra"}
+                {creatingRegra ? "Salvando..." : editingRegraId ? "Atualizar regra" : "Criar regra"}
               </Button>
+              {editingRegraId ? (
+                <Button type="button" variant="outline" className="w-full" onClick={handleCancelarEdicaoRegra}>
+                  Cancelar edição
+                </Button>
+              ) : null}
             </form>
           </CardContent>
         </Card>
@@ -411,6 +471,20 @@ export default function TtdPage() {
                 <p className="text-xs text-muted-foreground">
                   Destinação: {regra.destinacao_final} · PCD: {regra.pcd_nivel_id}
                 </p>
+                <div className="mt-2 flex gap-2">
+                  <Button type="button" size="sm" variant="outline" onClick={() => handleEditarRegra(regra)}>
+                    Editar
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleExcluirRegra(regra.id)}
+                    disabled={deletingRegraId === regra.id}
+                  >
+                    {deletingRegraId === regra.id ? "Excluindo..." : "Excluir"}
+                  </Button>
+                </div>
               </div>
             ))}
           </CardContent>

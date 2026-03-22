@@ -69,6 +69,8 @@ function flattenPcdTree(nodes: PcdNivel[]): PcdNivel[] {
 export default function GovernancaPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [creatingEntrada, setCreatingEntrada] = useState(false);
+  const [editingEntradaId, setEditingEntradaId] = useState<string | null>(null);
+  const [deletingEntradaId, setDeletingEntradaId] = useState<string | null>(null);
   const [checkingIntegridade, setCheckingIntegridade] = useState(false);
 
   const [pcdNivelId, setPcdNivelId] = useState("");
@@ -106,15 +108,25 @@ export default function GovernancaPage() {
     setErrorMessage(null);
     setCreatingEntrada(true);
     try {
-      await api.post("/governanca/matriz", {
-        pcd_nivel_id: pcdNivelId,
-        legislacao,
-        artigo: artigo || null,
-        norma_interna: normaInterna || null,
-        regra_retencao_id: null,
-        risco,
-        evidencia: evidencia || null,
-      });
+      if (editingEntradaId) {
+        await api.patch(`/governanca/matriz/${editingEntradaId}`, {
+          legislacao,
+          artigo: artigo || null,
+          norma_interna: normaInterna || null,
+          risco,
+          evidencia: evidencia || null,
+        });
+      } else {
+        await api.post("/governanca/matriz", {
+          pcd_nivel_id: pcdNivelId,
+          legislacao,
+          artigo: artigo || null,
+          norma_interna: normaInterna || null,
+          regra_retencao_id: null,
+          risco,
+          evidencia: evidencia || null,
+        });
+      }
 
       setPcdNivelId("");
       setLegislacao("");
@@ -122,11 +134,52 @@ export default function GovernancaPage() {
       setNormaInterna("");
       setRisco("medio");
       setEvidencia("");
+      setEditingEntradaId(null);
       await mutateMatriz();
     } catch {
-      setErrorMessage("Falha ao criar entrada na matriz de rastreabilidade.");
+      setErrorMessage(editingEntradaId ? "Falha ao atualizar entrada da matriz." : "Falha ao criar entrada na matriz de rastreabilidade.");
     } finally {
       setCreatingEntrada(false);
+    }
+  }
+
+  function handleEditarEntrada(item: MatrizItem) {
+    setErrorMessage(null);
+    setEditingEntradaId(item.id);
+    setPcdNivelId(item.pcd_nivel_id);
+    setLegislacao(item.legislacao);
+    setArtigo(item.artigo ?? "");
+    setNormaInterna(item.norma_interna ?? "");
+    setRisco(item.risco ?? "medio");
+    setEvidencia(item.evidencia ?? "");
+  }
+
+  function handleCancelarEdicao() {
+    setEditingEntradaId(null);
+    setPcdNivelId("");
+    setLegislacao("");
+    setArtigo("");
+    setNormaInterna("");
+    setRisco("medio");
+    setEvidencia("");
+  }
+
+  async function handleExcluirEntrada(entradaId: string) {
+    if (!confirm("Deseja excluir esta entrada da matriz?")) {
+      return;
+    }
+    setErrorMessage(null);
+    setDeletingEntradaId(entradaId);
+    try {
+      await api.delete(`/governanca/matriz/${entradaId}`);
+      if (editingEntradaId === entradaId) {
+        handleCancelarEdicao();
+      }
+      await mutateMatriz();
+    } catch {
+      setErrorMessage("Falha ao excluir entrada da matriz.");
+    } finally {
+      setDeletingEntradaId(null);
     }
   }
 
@@ -174,6 +227,7 @@ export default function GovernancaPage() {
                 required
                 value={pcdNivelId}
                 onChange={(event) => setPcdNivelId(event.target.value)}
+                disabled={Boolean(editingEntradaId)}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               >
                 <option value="">Nível do PCD</option>
@@ -225,8 +279,13 @@ export default function GovernancaPage() {
               />
 
               <Button type="submit" className="w-full" disabled={creatingEntrada}>
-                {creatingEntrada ? "Salvando..." : "Criar entrada"}
+                {creatingEntrada ? "Salvando..." : editingEntradaId ? "Atualizar entrada" : "Criar entrada"}
               </Button>
+              {editingEntradaId ? (
+                <Button type="button" variant="outline" className="w-full" onClick={handleCancelarEdicao}>
+                  Cancelar edição
+                </Button>
+              ) : null}
             </form>
           </CardContent>
         </Card>
@@ -280,6 +339,20 @@ export default function GovernancaPage() {
                 <p className="text-xs text-muted-foreground">
                   Risco: {item.risco || "—"} · PCD: {item.pcd_nivel_id}
                 </p>
+                <div className="mt-2 flex gap-2">
+                  <Button type="button" size="sm" variant="outline" onClick={() => handleEditarEntrada(item)}>
+                    Editar
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleExcluirEntrada(item.id)}
+                    disabled={deletingEntradaId === item.id}
+                  >
+                    {deletingEntradaId === item.id ? "Excluindo..." : "Excluir"}
+                  </Button>
+                </div>
               </div>
             ))}
           </CardContent>

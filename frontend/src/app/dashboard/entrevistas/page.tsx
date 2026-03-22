@@ -75,10 +75,19 @@ type SimulacaoResult = {
   pode_concluir: boolean;
 };
 
+type UserItem = {
+  id: string;
+  nome: string;
+  email: string;
+  role: string;
+  ativo: boolean;
+};
+
 type EntrevistaSessao = {
   id: string;
   roteiro_id: string;
   entrevistador_id: string | null;
+  cliente_id: string | null;
   status: string;
   respostas: Record<string, unknown>;
   created_at: string;
@@ -166,8 +175,13 @@ export default function EntrevistasPage() {
   const [selectedRoteiroId, setSelectedRoteiroId] = useState<string | null>(
     null
   );
+  const [editingRoteiroId, setEditingRoteiroId] = useState<string | null>(null);
+  const [savingRoteiro, setSavingRoteiro] = useState(false);
+  const [deletingRoteiroId, setDeletingRoteiroId] = useState<string | null>(null);
   const [creatingRoteiro, setCreatingRoteiro] = useState(false);
   const [addingPergunta, setAddingPergunta] = useState(false);
+  const [editingPerguntaId, setEditingPerguntaId] = useState<string | null>(null);
+  const [deletingPerguntaId, setDeletingPerguntaId] = useState<string | null>(null);
   const [simulating, setSimulating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [simulacao, setSimulacao] = useState<SimulacaoResult | null>(null);
@@ -191,6 +205,11 @@ export default function EntrevistasPage() {
   const [wizardStepIndex, setWizardStepIndex] = useState(0);
   const [wizardLoading, setWizardLoading] = useState(false);
   const [entrevistaAtivaId, setEntrevistaAtivaId] = useState<string | null>(null);
+  const [entrevistasRoteiro, setEntrevistasRoteiro] = useState<EntrevistaSessao[]>([]);
+  const [loadingEntrevistas, setLoadingEntrevistas] = useState(false);
+  const [updatingEntrevistaId, setUpdatingEntrevistaId] = useState<string | null>(null);
+  const [deletingEntrevistaId, setDeletingEntrevistaId] = useState<string | null>(null);
+  const [deletingEvidenciaId, setDeletingEvidenciaId] = useState<string | null>(null);
   const [evidencias, setEvidencias] = useState<EvidenciaItem[]>([]);
   const [arquivoEvidencia, setArquivoEvidencia] = useState<File | null>(null);
   const [arquivoInputKey, setArquivoInputKey] = useState(0);
@@ -213,6 +232,8 @@ export default function EntrevistasPage() {
   const [previewAssistente, setPreviewAssistente] =
     useState<AssistentePreviewResult | null>(null);
   const [carregandoPreviewAssistente, setCarregandoPreviewAssistente] = useState(false);
+  const [clientes, setClientes] = useState<UserItem[]>([]);
+  const [clienteIdSelecionado, setClienteIdSelecionado] = useState<string>("");
 
   const {
     data: roteirosRaw,
@@ -276,6 +297,23 @@ export default function EntrevistasPage() {
     };
   }, [evidenciaPreview]);
 
+  useEffect(() => {
+    if (!selectedRoteiroId) {
+      setEntrevistasRoteiro([]);
+      return;
+    }
+    void carregarEntrevistas(selectedRoteiroId);
+  }, [selectedRoteiroId]);
+
+  useEffect(() => {
+    api.get<UserItem[]>("/admin/usuarios")
+      .then(({ data }) => {
+        const items = (data as unknown as { items?: UserItem[] })?.items ?? (Array.isArray(data) ? data : []);
+        setClientes(items.filter((u) => u.role === "cliente" && u.ativo));
+      })
+      .catch(() => {});
+  }, []);
+
   function formatBytes(size: number | null): string {
     if (size === null) {
       return "0 B";
@@ -320,6 +358,16 @@ export default function EntrevistasPage() {
       `/roteiros/entrevistas/${entrevistaId}/evidencias`
     );
     setEvidencias(data);
+  }
+
+  async function carregarEntrevistas(roteiroId: string) {
+    setLoadingEntrevistas(true);
+    try {
+      const { data } = await api.get<EntrevistaSessao[]>(`/roteiros/${roteiroId}/entrevistas`);
+      setEntrevistasRoteiro(data);
+    } finally {
+      setLoadingEntrevistas(false);
+    }
   }
 
   function handleToggleCondicao(checked: boolean) {
@@ -389,10 +437,83 @@ export default function EntrevistasPage() {
       setOrdem(1);
       resetExecucao();
       await mutateRoteiros();
-    } catch {
-      setErrorMessage("Não foi possível criar o roteiro. Verifique o login.");
+    } catch (err: unknown) {
+      const status =
+        typeof err === "object" &&
+        err !== null &&
+        "response" in err &&
+        typeof err.response === "object" &&
+        err.response !== null &&
+        "status" in err.response &&
+        typeof err.response.status === "number"
+          ? err.response.status
+          : null;
+
+      if (status !== 401) {
+        setErrorMessage("Não foi possível criar o roteiro. Verifique o login.");
+      }
     } finally {
       setCreatingRoteiro(false);
+    }
+  }
+
+  function handleEditarRoteiro(roteiro: RoteiroListItem) {
+    setEditingRoteiroId(roteiro.id);
+    setSelectedRoteiroId(roteiro.id);
+    setTitulo(roteiro.titulo);
+    setArea(roteiro.area || "");
+    setDescricao(roteiroSelecionado?.descricao || "");
+  }
+
+  function handleCancelarEdicaoRoteiro() {
+    setEditingRoteiroId(null);
+    setTitulo("");
+    setArea("");
+    setDescricao("");
+  }
+
+  async function handleSalvarRoteiroEdicao() {
+    if (!editingRoteiroId) {
+      return;
+    }
+    setErrorMessage(null);
+    setSavingRoteiro(true);
+    try {
+      await api.patch(`/roteiros/${editingRoteiroId}`, {
+        titulo,
+        area: area || null,
+        descricao: descricao || null,
+      });
+      await mutateRoteiros();
+      await mutateRoteiro();
+      handleCancelarEdicaoRoteiro();
+    } catch {
+      setErrorMessage("Não foi possível atualizar o roteiro.");
+    } finally {
+      setSavingRoteiro(false);
+    }
+  }
+
+  async function handleExcluirRoteiro(roteiroId: string) {
+    if (!confirm("Deseja arquivar este roteiro?")) {
+      return;
+    }
+    setErrorMessage(null);
+    setDeletingRoteiroId(roteiroId);
+    try {
+      await api.delete(`/roteiros/${roteiroId}`);
+      await mutateRoteiros();
+      if (selectedRoteiroId === roteiroId) {
+        setSelectedRoteiroId(null);
+        resetExecucao();
+      }
+      if (editingRoteiroId === roteiroId) {
+        handleCancelarEdicaoRoteiro();
+      }
+    } catch {
+      setErrorMessage("Não foi possível arquivar o roteiro.");
+    } finally {
+      setDeletingRoteiroId(null);
     }
   }
 
@@ -426,22 +547,36 @@ export default function EntrevistasPage() {
     setErrorMessage(null);
     setAddingPergunta(true);
     try {
-      await api.post(`/roteiros/${selectedRoteiroId}/perguntas`, {
-        ordem,
-        texto: textoPergunta,
-        tipo: tipoPergunta,
-        obrigatoria: obrigatoriaPergunta,
-        secao: null,
-        metadado_alvo: null,
-        opcoes: null,
-        condicoes,
-      });
+      if (editingPerguntaId) {
+        await api.patch(`/roteiros/${selectedRoteiroId}/perguntas/${editingPerguntaId}`, {
+          ordem,
+          texto: textoPergunta,
+          tipo: tipoPergunta,
+          obrigatoria: obrigatoriaPergunta,
+          secao: null,
+          metadado_alvo: null,
+          opcoes: null,
+          condicoes,
+        });
+      } else {
+        await api.post(`/roteiros/${selectedRoteiroId}/perguntas`, {
+          ordem,
+          texto: textoPergunta,
+          tipo: tipoPergunta,
+          obrigatoria: obrigatoriaPergunta,
+          secao: null,
+          metadado_alvo: null,
+          opcoes: null,
+          condicoes,
+        });
+      }
 
       setTextoPergunta("");
       setTipoPergunta("texto");
       setObrigatoriaPergunta(true);
       setUsarCondicao(false);
       setCondicoesDraft([]);
+      setEditingPerguntaId(null);
 
       await mutateRoteiro();
       setOrdem((prev) => prev + 1);
@@ -449,6 +584,60 @@ export default function EntrevistasPage() {
       setErrorMessage("Não foi possível adicionar a pergunta.");
     } finally {
       setAddingPergunta(false);
+    }
+  }
+
+  function handleEditarPergunta(pergunta: PerguntaItem) {
+    setEditingPerguntaId(pergunta.id);
+    setOrdem(pergunta.ordem);
+    setTextoPergunta(pergunta.texto);
+    setTipoPergunta(pergunta.tipo);
+    setObrigatoriaPergunta(pergunta.obrigatoria);
+    if (pergunta.condicoes.length > 0) {
+      setUsarCondicao(true);
+      setCondicoesDraft(
+        pergunta.condicoes.map((item, idx) => ({
+          uiId: `cond-edit-${idx}-${item.id}`,
+          perguntaId: String((item.valor?.pergunta_id as string) || ""),
+          operador: item.operador,
+          valor: String((item.valor?.valor as string | number | boolean) ?? ""),
+          acao: item.acao,
+        }))
+      );
+    } else {
+      setUsarCondicao(false);
+      setCondicoesDraft([]);
+    }
+  }
+
+  function handleCancelarEdicaoPergunta() {
+    setEditingPerguntaId(null);
+    setTextoPergunta("");
+    setTipoPergunta("texto");
+    setObrigatoriaPergunta(true);
+    setUsarCondicao(false);
+    setCondicoesDraft([]);
+  }
+
+  async function handleExcluirPergunta(perguntaId: string) {
+    if (!selectedRoteiroId) {
+      return;
+    }
+    if (!confirm("Deseja excluir esta pergunta?")) {
+      return;
+    }
+    setErrorMessage(null);
+    setDeletingPerguntaId(perguntaId);
+    try {
+      await api.delete(`/roteiros/${selectedRoteiroId}/perguntas/${perguntaId}`);
+      await mutateRoteiro();
+      if (editingPerguntaId === perguntaId) {
+        handleCancelarEdicaoPergunta();
+      }
+    } catch {
+      setErrorMessage("Não foi possível excluir a pergunta.");
+    } finally {
+      setDeletingPerguntaId(null);
     }
   }
 
@@ -549,14 +738,81 @@ export default function EntrevistasPage() {
 
       const { data } = await api.post<EntrevistaSessao>(
         `/roteiros/${selectedRoteiroId}/entrevistas`,
-        { respostas: buildRespostasPayload(wizardRespostas) }
+        { respostas: buildRespostasPayload(wizardRespostas), ...(clienteIdSelecionado ? { cliente_id: clienteIdSelecionado } : {}) }
       );
       setEntrevistaAtivaId(data.id);
+      await carregarEntrevistas(selectedRoteiroId);
       await carregarEvidencias(data.id);
     } catch {
       setErrorMessage("Não foi possível iniciar a sessão de evidências.");
     } finally {
       setIniciandoSessaoEvidencia(false);
+    }
+  }
+
+  async function handleSelecionarEntrevista(entrevistaId: string) {
+    setEntrevistaAtivaId(entrevistaId);
+    await carregarEvidencias(entrevistaId);
+  }
+
+  async function handleAtualizarStatusEntrevista(entrevistaId: string, status: "em_andamento" | "concluida" | "cancelada") {
+    setErrorMessage(null);
+    setUpdatingEntrevistaId(entrevistaId);
+    try {
+      await api.patch(`/roteiros/entrevistas/${entrevistaId}`, {
+        status,
+        respostas: buildRespostasPayload(wizardRespostas),
+      });
+      if (selectedRoteiroId) {
+        await carregarEntrevistas(selectedRoteiroId);
+      }
+    } catch {
+      setErrorMessage("Não foi possível atualizar a entrevista.");
+    } finally {
+      setUpdatingEntrevistaId(null);
+    }
+  }
+
+  async function handleExcluirEntrevista(entrevistaId: string) {
+    if (!confirm("Deseja excluir esta entrevista?")) {
+      return;
+    }
+    setErrorMessage(null);
+    setDeletingEntrevistaId(entrevistaId);
+    try {
+      await api.delete(`/roteiros/entrevistas/${entrevistaId}`);
+      if (selectedRoteiroId) {
+        await carregarEntrevistas(selectedRoteiroId);
+      }
+      if (entrevistaAtivaId === entrevistaId) {
+        setEntrevistaAtivaId(null);
+        setEvidencias([]);
+      }
+    } catch {
+      setErrorMessage("Não foi possível excluir a entrevista.");
+    } finally {
+      setDeletingEntrevistaId(null);
+    }
+  }
+
+  async function handleExcluirEvidencia(evidencia: EvidenciaItem) {
+    if (!confirm("Deseja excluir esta evidência?")) {
+      return;
+    }
+    setErrorMessage(null);
+    setDeletingEvidenciaId(evidencia.id);
+    try {
+      await api.delete(`/roteiros/entrevistas/${evidencia.entrevista_id}/evidencias/${evidencia.id}`);
+      if (entrevistaAtivaId) {
+        await carregarEvidencias(entrevistaAtivaId);
+      }
+      if (evidenciaPreview?.id === evidencia.id) {
+        limparPreviewRemoto();
+      }
+    } catch {
+      setErrorMessage("Não foi possível excluir a evidência.");
+    } finally {
+      setDeletingEvidenciaId(null);
     }
   }
 
@@ -691,7 +947,7 @@ export default function EntrevistasPage() {
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <Card className="xl:col-span-1">
           <CardHeader>
-            <CardTitle>Novo Roteiro</CardTitle>
+            <CardTitle>{editingRoteiroId ? "Editar Roteiro" : "Novo Roteiro"}</CardTitle>
             <CardDescription>
               Crie um roteiro para iniciar o fluxo da entrevista dinâmica
             </CardDescription>
@@ -717,9 +973,20 @@ export default function EntrevistasPage() {
                 className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 placeholder="Descrição do roteiro"
               />
-              <Button type="submit" className="w-full" disabled={creatingRoteiro}>
-                {creatingRoteiro ? "Criando..." : "Criar roteiro"}
-              </Button>
+              {editingRoteiroId ? (
+                <>
+                  <Button type="button" className="w-full" onClick={handleSalvarRoteiroEdicao} disabled={savingRoteiro}>
+                    {savingRoteiro ? "Salvando..." : "Salvar edição"}
+                  </Button>
+                  <Button type="button" variant="outline" className="w-full" onClick={handleCancelarEdicaoRoteiro}>
+                    Cancelar edição
+                  </Button>
+                </>
+              ) : (
+                <Button type="submit" className="w-full" disabled={creatingRoteiro}>
+                  {creatingRoteiro ? "Criando..." : "Criar roteiro"}
+                </Button>
+              )}
             </form>
           </CardContent>
         </Card>
@@ -736,26 +1003,44 @@ export default function EntrevistasPage() {
           <CardContent>
             <div className="space-y-2">
               {roteirosData?.items?.map((roteiro) => (
-                <button
+                <div
                   key={roteiro.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedRoteiroId(roteiro.id);
-                    setOrdem(roteiro.total_perguntas + 1);
-                    resetExecucao();
-                  }}
                   className={`w-full rounded-lg border p-3 text-left transition-colors ${
                     selectedRoteiroId === roteiro.id
                       ? "border-primary bg-primary/5"
                       : "border-border bg-background hover:bg-muted/40"
                   }`}
                 >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedRoteiroId(roteiro.id);
+                      setOrdem(roteiro.total_perguntas + 1);
+                      resetExecucao();
+                    }}
+                    className="w-full text-left"
+                  >
                   <p className="font-medium text-foreground">{roteiro.titulo}</p>
                   <p className="text-xs text-muted-foreground">
                     Área: {roteiro.area || "—"} · Versão {roteiro.versao} ·
                     Perguntas: {roteiro.total_perguntas} · Status: {roteiro.status}
                   </p>
-                </button>
+                  </button>
+                  <div className="mt-2 flex gap-2">
+                    <Button type="button" size="sm" variant="outline" onClick={() => handleEditarRoteiro(roteiro)}>
+                      Editar
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleExcluirRoteiro(roteiro.id)}
+                      disabled={deletingRoteiroId === roteiro.id}
+                    >
+                      {deletingRoteiroId === roteiro.id ? "Arquivando..." : "Arquivar"}
+                    </Button>
+                  </div>
+                </div>
               ))}
             </div>
           </CardContent>
@@ -927,8 +1212,13 @@ export default function EntrevistasPage() {
                 disabled={addingPergunta || !selectedRoteiroId}
                 className="w-full"
               >
-                {addingPergunta ? "Adicionando..." : "Adicionar pergunta"}
+                {addingPergunta ? "Salvando..." : editingPerguntaId ? "Salvar edição" : "Adicionar pergunta"}
               </Button>
+              {editingPerguntaId ? (
+                <Button type="button" variant="outline" className="w-full" onClick={handleCancelarEdicaoPergunta}>
+                  Cancelar edição
+                </Button>
+              ) : null}
             </form>
 
             <div className="space-y-2">
@@ -943,6 +1233,20 @@ export default function EntrevistasPage() {
                       : "Não"}{" "}
                     · Condições: {pergunta.condicoes.length}
                   </p>
+                  <div className="mt-2 flex gap-2">
+                    <Button type="button" size="sm" variant="outline" onClick={() => handleEditarPergunta(pergunta)}>
+                      Editar
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleExcluirPergunta(pergunta.id)}
+                      disabled={deletingPerguntaId === pergunta.id}
+                    >
+                      {deletingPerguntaId === pergunta.id ? "Excluindo..." : "Excluir"}
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1246,6 +1550,78 @@ export default function EntrevistasPage() {
                 </Button>
               </div>
 
+              {/* Seletor de cliente */}
+              <div className="rounded-lg border border-border p-3 space-y-2">
+                <p className="text-xs font-semibold uppercase text-muted-foreground">
+                  Atribuir a cliente
+                </p>
+                <select
+                  value={clienteIdSelecionado}
+                  onChange={(e) => setClienteIdSelecionado(e.target.value)}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  <option value="">Sem cliente (uso interno)</option>
+                  {clientes.map((c) => (
+                    <option key={c.id} value={c.id}>{c.nome} ({c.email})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2 rounded-lg border border-border p-3">
+                <p className="text-xs font-semibold uppercase text-muted-foreground">
+                  Entrevistas do roteiro
+                </p>
+                {loadingEntrevistas ? (
+                  <p className="text-sm text-muted-foreground">Carregando entrevistas...</p>
+                ) : entrevistasRoteiro.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Nenhuma entrevista registrada para este roteiro.</p>
+                ) : (
+                  entrevistasRoteiro.map((entrevista) => (
+                    <div key={entrevista.id} className="rounded-md border border-border p-2">
+                      <p className="text-sm font-medium text-foreground">{entrevista.id}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Status: {entrevista.status} · Criada em {new Date(entrevista.created_at).toLocaleString("pt-BR")}
+                        {entrevista.cliente_id && (
+                          <> · Cliente: {clientes.find((c) => c.id === entrevista.cliente_id)?.nome || entrevista.cliente_id.slice(0, 8)}</>
+                        )}
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <Button type="button" size="sm" variant="outline" onClick={() => handleSelecionarEntrevista(entrevista.id)}>
+                          Selecionar
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleAtualizarStatusEntrevista(entrevista.id, "concluida")}
+                          disabled={updatingEntrevistaId === entrevista.id}
+                        >
+                          Concluir
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleAtualizarStatusEntrevista(entrevista.id, "cancelada")}
+                          disabled={updatingEntrevistaId === entrevista.id}
+                        >
+                          Cancelar
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleExcluirEntrevista(entrevista.id)}
+                          disabled={deletingEntrevistaId === entrevista.id}
+                        >
+                          {deletingEntrevistaId === entrevista.id ? "Excluindo..." : "Excluir"}
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
               {entrevistaAtivaId ? (
                 <form onSubmit={handleUploadEvidencia} className="space-y-3 rounded-lg border border-border p-3">
                   <input
@@ -1308,6 +1684,16 @@ export default function EntrevistasPage() {
                           {carregandoPreviewId === evidencia.id
                             ? "Carregando..."
                             : "Pré-visualizar"}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="ml-2"
+                          onClick={() => handleExcluirEvidencia(evidencia)}
+                          disabled={deletingEvidenciaId === evidencia.id}
+                        >
+                          {deletingEvidenciaId === evidencia.id ? "Excluindo..." : "Excluir"}
                         </Button>
                       </div>
                     </div>

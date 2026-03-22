@@ -561,9 +561,11 @@ export default function PcdPage() {
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               >
                 <option value="funcao">Função</option>
+                <option value="subfuncao">Subfunção</option>
                 <option value="atividade">Atividade</option>
                 <option value="serie">Série</option>
                 <option value="classe">Classe</option>
+                <option value="tipo_documental">Tipo Documental</option>
               </select>
 
               <input

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import api from "@/lib/api";
 import { useUsuarios } from "@/hooks/use-api";
@@ -17,6 +18,9 @@ type UsuarioItem = {
   email: string;
   nome: string;
   role: string;
+  ativo?: boolean;
+  departamento?: string | null;
+  unidade?: string | null;
 };
 
 type UsuariosResponse = {
@@ -52,8 +56,32 @@ type SmokeCheckResult = {
   checks: Record<string, Record<string, string | number>>;
 };
 
+type ResetSenhaResponse = {
+  user_id: string;
+  senha_temporaria: string;
+  force_password_change: boolean;
+};
+
+const crudLinks = [
+  { href: "/dashboard/pcd", label: "PCD", description: "Plano de classificação" },
+  { href: "/dashboard/ttd", label: "TTD", description: "Regras, hold e destinação" },
+  { href: "/dashboard/governanca", label: "Governança", description: "Matriz e auditoria" },
+  { href: "/dashboard/dados-migracao", label: "Dados/Migração", description: "Inventário, cleansing e ondas" },
+  { href: "/dashboard/conhecimento", label: "Conhecimento", description: "Templates e trilhas" },
+  { href: "/dashboard/ciclo-vida", label: "Ciclo de Vida", description: "Jobs e selos" },
+  { href: "/dashboard/integracao", label: "Integração", description: "Importações e reprocessamento" },
+  { href: "/dashboard/perfil", label: "Perfil", description: "Troca de senha própria" },
+];
+
 export default function AdminPage() {
   const [selectedUserId, setSelectedUserId] = useState("");
+  const [novoNome, setNovoNome] = useState("");
+  const [novoEmail, setNovoEmail] = useState("");
+  const [novoRole, setNovoRole] = useState("viewer");
+  const [novaSenha, setNovaSenha] = useState("");
+  const [confirmarSenha, setConfirmarSenha] = useState("");
+  const [novoDepartamento, setNovoDepartamento] = useState("");
+  const [novaUnidade, setNovaUnidade] = useState("");
   const [cpf, setCpf] = useState("");
   const [emailSecundario, setEmailSecundario] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -64,8 +92,14 @@ export default function AdminPage() {
   const [regraBackupId, setRegraBackupId] = useState("");
   const [backupSnapshots, setBackupSnapshots] = useState<BackupSnapshot[]>([]);
   const [smokeResult, setSmokeResult] = useState<SmokeCheckResult | null>(null);
+  const [senhaTemporaria, setSenhaTemporaria] = useState<string | null>(null);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [editNome, setEditNome] = useState("");
+  const [editRole, setEditRole] = useState("viewer");
+  const [editDepartamento, setEditDepartamento] = useState("");
+  const [editUnidade, setEditUnidade] = useState("");
 
-  const { data: usuariosRaw, isLoading } = useUsuarios();
+  const { data: usuariosRaw, isLoading, mutate: mutateUsuarios } = useUsuarios();
   const usuarios = useMemo(
     () => (((usuariosRaw as UsuariosResponse | undefined)?.items ?? []) as UsuarioItem[]),
     [usuariosRaw]
@@ -135,6 +169,71 @@ export default function AdminPage() {
     }
   }
 
+  async function handleResetSenha() {
+    if (!selectedUserId) {
+      setErrorMessage("Selecione um usuário.");
+      return;
+    }
+    if (!confirm("Deseja resetar a senha deste usuário?")) {
+      return;
+    }
+
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setSenhaTemporaria(null);
+    setLoadingAction("reset-senha");
+    try {
+      const { data } = await api.post<ResetSenhaResponse>(`/admin/usuarios/${selectedUserId}/reset-senha`);
+      setSenhaTemporaria(data.senha_temporaria);
+      setSuccessMessage("Senha resetada com sucesso.");
+    } catch {
+      setErrorMessage("Falha ao resetar senha do usuário.");
+    } finally {
+      setLoadingAction(null);
+    }
+  }
+
+  async function handleCriarUsuario() {
+    if (!novoNome.trim() || !novoEmail.trim() || !novaSenha.trim()) {
+      setErrorMessage("Preencha nome, email e senha para criar o usuário.");
+      return;
+    }
+    if (novaSenha !== confirmarSenha) {
+      setErrorMessage("A confirmação de senha não confere.");
+      return;
+    }
+
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setLoadingAction("create-user");
+    try {
+      const { data } = await api.post<UsuarioItem>("/admin/usuarios", {
+        email: novoEmail.trim().toLowerCase(),
+        nome: novoNome.trim(),
+        senha: novaSenha,
+        role: novoRole,
+        departamento: novoDepartamento.trim() || null,
+        unidade: novaUnidade.trim() || null,
+        atributos: {},
+      });
+
+      await mutateUsuarios();
+      setSelectedUserId(data.id);
+      setNovoNome("");
+      setNovoEmail("");
+      setNovaSenha("");
+      setConfirmarSenha("");
+      setNovoRole("viewer");
+      setNovoDepartamento("");
+      setNovaUnidade("");
+      setSuccessMessage("Usuário criado com sucesso e disponível no Painel LGPD.");
+    } catch {
+      setErrorMessage("Falha ao criar usuário. Verifique permissões e se o email já existe.");
+    } finally {
+      setLoadingAction(null);
+    }
+  }
+
   async function loadBackups() {
     try {
       const { data } = await api.get<BackupSnapshot[]>("/backup/snapshots");
@@ -195,6 +294,64 @@ export default function AdminPage() {
     }
   }
 
+  function handleIniciarEdicaoUsuario(usuario: UsuarioItem) {
+    setEditingUserId(usuario.id);
+    setEditNome(usuario.nome || "");
+    setEditRole(usuario.role || "viewer");
+    setEditDepartamento(usuario.departamento || "");
+    setEditUnidade(usuario.unidade || "");
+  }
+
+  function handleCancelarEdicaoUsuario() {
+    setEditingUserId(null);
+    setEditNome("");
+    setEditRole("viewer");
+    setEditDepartamento("");
+    setEditUnidade("");
+  }
+
+  async function handleSalvarUsuario(userId: string) {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setLoadingAction(`save-user-${userId}`);
+    try {
+      await api.patch(`/admin/usuarios/${userId}`, {
+        nome: editNome,
+        role: editRole,
+        departamento: editDepartamento || null,
+        unidade: editUnidade || null,
+      });
+      await mutateUsuarios();
+      setSuccessMessage("Usuário atualizado com sucesso.");
+      handleCancelarEdicaoUsuario();
+    } catch {
+      setErrorMessage("Falha ao atualizar usuário.");
+    } finally {
+      setLoadingAction(null);
+    }
+  }
+
+  async function handleDesativarUsuario(userId: string) {
+    if (!confirm("Deseja desativar este usuário?")) {
+      return;
+    }
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setLoadingAction(`disable-user-${userId}`);
+    try {
+      await api.delete(`/admin/usuarios/${userId}`);
+      await mutateUsuarios();
+      setSuccessMessage("Usuário desativado com sucesso.");
+      if (selectedUserId === userId) {
+        setSelectedUserId("");
+      }
+    } catch {
+      setErrorMessage("Falha ao desativar usuário.");
+    } finally {
+      setLoadingAction(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -214,6 +371,95 @@ export default function AdminPage() {
           {successMessage}
         </div>
       ) : null}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Acessos rápidos</CardTitle>
+          <CardDescription>
+            Atalhos para os CRUDs e fluxos administrativos disponíveis no dashboard.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {crudLinks.map((item) => (
+              <div key={item.href} className="rounded-lg border border-border p-4">
+                <p className="text-sm font-medium text-foreground">{item.label}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{item.description}</p>
+                <Button asChild className="mt-3" variant="outline">
+                  <Link href={item.href}>Abrir</Link>
+                </Button>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Criar usuário</CardTitle>
+          <CardDescription>
+            Cadastro rápido para disponibilizar usuários no Painel LGPD.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <input
+            value={novoNome}
+            onChange={(event) => setNovoNome(event.target.value)}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            placeholder="Nome completo"
+          />
+          <input
+            type="email"
+            value={novoEmail}
+            onChange={(event) => setNovoEmail(event.target.value)}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            placeholder="Email"
+          />
+          <select
+            value={novoRole}
+            onChange={(event) => setNovoRole(event.target.value)}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          >
+            <option value="viewer">viewer</option>
+            <option value="analista">analista</option>
+            <option value="arquivista">arquivista</option>
+            <option value="classificador">classificador</option>
+            <option value="auditor">auditor</option>
+            <option value="gestor">gestor</option>
+            <option value="admin">admin</option>
+            <option value="cliente">cliente</option>
+          </select>
+          <input
+            value={novoDepartamento}
+            onChange={(event) => setNovoDepartamento(event.target.value)}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            placeholder="Departamento (opcional)"
+          />
+          <input
+            value={novaUnidade}
+            onChange={(event) => setNovaUnidade(event.target.value)}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            placeholder="Unidade (opcional)"
+          />
+          <input
+            type="password"
+            value={novaSenha}
+            onChange={(event) => setNovaSenha(event.target.value)}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            placeholder="Senha inicial"
+          />
+          <input
+            type="password"
+            value={confirmarSenha}
+            onChange={(event) => setConfirmarSenha(event.target.value)}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            placeholder="Confirmar senha"
+          />
+          <Button type="button" onClick={handleCriarUsuario} disabled={loadingAction !== null}>
+            {loadingAction === "create-user" ? "Criando usuário..." : "Criar usuário"}
+          </Button>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -260,7 +506,102 @@ export default function AdminPage() {
             <Button type="button" variant="outline" onClick={handleAnonimizar} disabled={loadingAction !== null}>
               {loadingAction === "anonimizar" ? "Anonimizando..." : "Anonimizar"}
             </Button>
+            <Button type="button" variant="outline" onClick={handleResetSenha} disabled={loadingAction !== null}>
+              {loadingAction === "reset-senha" ? "Resetando..." : "Reset senha"}
+            </Button>
           </div>
+          {senhaTemporaria ? (
+            <p className="text-xs text-muted-foreground">
+              Senha temporária: <strong>{senhaTemporaria}</strong>
+            </p>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Gestão de usuários</CardTitle>
+          <CardDescription>
+            Edição rápida de perfil/permissão e desativação de usuários.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {usuarios.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhum usuário disponível.</p>
+          ) : (
+            usuarios.map((usuario) => (
+              <div key={usuario.id} className="rounded-md border border-border p-3">
+                {editingUserId === usuario.id ? (
+                  <div className="space-y-2">
+                    <input
+                      value={editNome}
+                      onChange={(event) => setEditNome(event.target.value)}
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      placeholder="Nome"
+                    />
+                    <select
+                      value={editRole}
+                      onChange={(event) => setEditRole(event.target.value)}
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    >
+                      <option value="viewer">viewer</option>
+                      <option value="analista">analista</option>
+                      <option value="arquivista">arquivista</option>
+                      <option value="classificador">classificador</option>
+                      <option value="auditor">auditor</option>
+                      <option value="gestor">gestor</option>
+                      <option value="admin">admin</option>
+                      <option value="cliente">cliente</option>
+                    </select>
+                    <input
+                      value={editDepartamento}
+                      onChange={(event) => setEditDepartamento(event.target.value)}
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      placeholder="Departamento"
+                    />
+                    <input
+                      value={editUnidade}
+                      onChange={(event) => setEditUnidade(event.target.value)}
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      placeholder="Unidade"
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => handleSalvarUsuario(usuario.id)}
+                        disabled={loadingAction === `save-user-${usuario.id}`}
+                      >
+                        {loadingAction === `save-user-${usuario.id}` ? "Salvando..." : "Salvar"}
+                      </Button>
+                      <Button type="button" size="sm" variant="outline" onClick={handleCancelarEdicaoUsuario}>
+                        Cancelar
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm font-medium text-foreground">{usuario.nome}</p>
+                    <p className="text-xs text-muted-foreground">{usuario.email} · {usuario.role}</p>
+                    <div className="mt-2 flex gap-2">
+                      <Button type="button" size="sm" variant="outline" onClick={() => handleIniciarEdicaoUsuario(usuario)}>
+                        Editar
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDesativarUsuario(usuario.id)}
+                        disabled={loadingAction === `disable-user-${usuario.id}`}
+                      >
+                        {loadingAction === `disable-user-${usuario.id}` ? "Desativando..." : "Desativar"}
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ))
+          )}
         </CardContent>
       </Card>
 

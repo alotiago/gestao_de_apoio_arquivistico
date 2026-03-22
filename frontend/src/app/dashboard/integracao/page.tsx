@@ -44,6 +44,7 @@ export default function IntegracaoPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
   const {
     data: importacoesRaw,
@@ -82,6 +83,39 @@ export default function IntegracaoPage() {
       setErrorMessage("Falha ao importar acervo CSV.");
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function handleReprocessar(importacaoId: string) {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setActionLoadingId(`reprocessar-${importacaoId}`);
+    try {
+      await api.post(`/integracao/importacoes/${importacaoId}/reprocessar`);
+      setSuccessMessage("Importação reprocessada com sucesso.");
+      await mutate();
+    } catch {
+      setErrorMessage("Falha ao reprocessar importação.");
+    } finally {
+      setActionLoadingId(null);
+    }
+  }
+
+  async function handleExcluir(importacaoId: string) {
+    if (!confirm("Deseja excluir esta importação?")) {
+      return;
+    }
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setActionLoadingId(`excluir-${importacaoId}`);
+    try {
+      await api.delete(`/integracao/importacoes/${importacaoId}`);
+      setSuccessMessage("Importação excluída com sucesso.");
+      await mutate();
+    } catch {
+      setErrorMessage("Falha ao excluir importação. Verifique se há sucesso associado.");
+    } finally {
+      setActionLoadingId(null);
     }
   }
 
@@ -161,6 +195,26 @@ export default function IntegracaoPage() {
               </p>
 
               <div className="mt-2 space-y-2">
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleReprocessar(item.id)}
+                    disabled={actionLoadingId === `reprocessar-${item.id}`}
+                  >
+                    {actionLoadingId === `reprocessar-${item.id}` ? "Reprocessando..." : "Reprocessar"}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleExcluir(item.id)}
+                    disabled={actionLoadingId === `excluir-${item.id}`}
+                  >
+                    {actionLoadingId === `excluir-${item.id}` ? "Excluindo..." : "Excluir"}
+                  </Button>
+                </div>
                 {item.resultados.slice(0, 5).map((resultado) => (
                   <div key={`${item.id}-${resultado.linha}`} className="rounded border border-border/60 p-2">
                     <p className="text-xs font-medium text-foreground">
