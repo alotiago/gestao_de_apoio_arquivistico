@@ -1,8 +1,15 @@
 from datetime import datetime
-from docx import Document
-from docx.shared import Pt
+from pathlib import Path
+import tempfile
+import os
 
-OUT = r"c:\des\gestao_de_apoio_arquivistico\docs\MANUAL_EXECUTIVO_TREINAMENTO_ARQUIVISTAS.docx"
+from PIL import Image, ImageDraw
+from docx import Document
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.shared import Inches, Pt
+
+ROOT = Path(__file__).resolve().parents[2]
+OUT = ROOT / "docs" / "MANUAL_EXECUTIVO_TREINAMENTO_ARQUIVISTAS.docx"
 
 
 def title(doc: Document, text: str) -> None:
@@ -10,6 +17,7 @@ def title(doc: Document, text: str) -> None:
     r = p.add_run(text)
     r.bold = True
     r.font.size = Pt(20)
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
 
 def bullets(doc: Document, items: list[str]) -> None:
@@ -17,8 +25,69 @@ def bullets(doc: Document, items: list[str]) -> None:
         doc.add_paragraph(item, style="List Bullet")
 
 
+def _brand_image_png() -> Path | None:
+    webp = ROOT / "frontend" / "public" / "branding" / "hw1-gradient.webp"
+    if not webp.exists():
+        return None
+
+    fd, tmp_name = tempfile.mkstemp(prefix="hw1_gradient_exec_", suffix=".png")
+    os.close(fd)
+    Path(tmp_name).unlink(missing_ok=True)
+    png = Path(tmp_name)
+    with Image.open(webp) as img:
+        img.convert("RGB").save(png, format="PNG")
+    return png
+
+
+def _save_with_fallback(doc: Document, path: Path) -> Path:
+    try:
+        doc.save(str(path))
+        return path
+    except PermissionError:
+        alt = path.with_name(f"{path.stem}_{datetime.now().strftime('%Y%m%d_%H%M%S')}{path.suffix}")
+        doc.save(str(alt))
+        return alt
+
+
+def _placeholder(path: Path, title: str) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1400, 800), color=(250, 250, 250))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle((30, 30, 1370, 770), outline=(0, 178, 168), width=5)
+    draw.text((80, 80), "HW1 - Print de Treinamento", fill=(0, 0, 0))
+    draw.text((80, 140), title, fill=(20, 20, 20))
+    draw.text((80, 200), "Substitua por captura real para a turma.", fill=(90, 90, 90))
+    img.save(path, format="PNG")
+    return path
+
+
+def _resolve_screenshot(filename: str, title: str) -> Path:
+    candidates = [
+        ROOT / "docs" / "screenshots" / filename,
+        ROOT / "frontend" / "public" / "screenshots" / filename,
+    ]
+    for item in candidates:
+        if item.exists():
+            return item
+    return _placeholder(ROOT / "docs" / "screenshots" / filename, title)
+
+
+def _add_screenshot(doc: Document, caption: str, filename: str) -> None:
+    path = _resolve_screenshot(filename, caption)
+    doc.add_paragraph(caption)
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p.add_run().add_picture(str(path), width=Inches(6.5))
+
+
 def main() -> None:
     doc = Document()
+
+    brand = _brand_image_png()
+    if brand:
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p.add_run().add_picture(str(brand), width=Inches(6.0))
 
     title(doc, "Manual Executivo de Treinamento - Arquivistas")
     doc.add_paragraph(f"Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
@@ -77,8 +146,16 @@ def main() -> None:
         "Relatorio diario exportado quando aplicavel.",
     ])
 
-    doc.save(OUT)
-    print(f"Manual executivo gerado em: {OUT}")
+    doc.add_heading("8. Prints de Referencia", level=1)
+    _add_screenshot(doc, "Login", "login.png")
+    _add_screenshot(doc, "Dashboard", "dashboard.png")
+    _add_screenshot(doc, "API Docs", "api_docs.png")
+
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    saved = _save_with_fallback(doc, OUT)
+    if brand and brand.exists():
+        brand.unlink(missing_ok=True)
+    print(f"Manual executivo gerado em: {saved}")
 
 
 if __name__ == "__main__":

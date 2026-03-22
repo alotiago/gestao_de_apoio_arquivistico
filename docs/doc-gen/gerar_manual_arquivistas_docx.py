@@ -1,8 +1,15 @@
 from datetime import datetime
-from docx import Document
-from docx.shared import Pt
+from pathlib import Path
+import tempfile
+import os
 
-OUT = r"c:\des\gestao_de_apoio_arquivistico\docs\MANUAL_COMPLETO_ARQUIVISTAS.docx"
+from PIL import Image, ImageDraw
+from docx import Document
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.shared import Inches, Pt
+
+ROOT = Path(__file__).resolve().parents[2]
+OUT = ROOT / "docs" / "MANUAL_COMPLETO_ARQUIVISTAS.docx"
 
 
 def add_title(doc: Document, text: str) -> None:
@@ -10,6 +17,7 @@ def add_title(doc: Document, text: str) -> None:
     r = p.add_run(text)
     r.bold = True
     r.font.size = Pt(20)
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
 
 def add_h1(doc: Document, text: str) -> None:
@@ -29,8 +37,72 @@ def add_bullets(doc: Document, items: list[str]) -> None:
         doc.add_paragraph(item, style="List Bullet")
 
 
+def _brand_image_png() -> Path | None:
+    """Convert HW1 gradient image to PNG for python-docx compatibility."""
+    webp = ROOT / "frontend" / "public" / "branding" / "hw1-gradient.webp"
+    if not webp.exists():
+        return None
+
+    fd, tmp_name = tempfile.mkstemp(prefix="hw1_gradient_", suffix=".png")
+    os.close(fd)
+    Path(tmp_name).unlink(missing_ok=True)
+    png = Path(tmp_name)
+    with Image.open(webp) as img:
+        img.convert("RGB").save(png, format="PNG")
+    return png
+
+
+def _save_with_fallback(doc: Document, path: Path) -> Path:
+    """Save to default name; if locked by Word, save a timestamped copy."""
+    try:
+        doc.save(str(path))
+        return path
+    except PermissionError:
+        alt = path.with_name(f"{path.stem}_{datetime.now().strftime('%Y%m%d_%H%M%S')}{path.suffix}")
+        doc.save(str(alt))
+        return alt
+
+
+def _placeholder(path: Path, title: str) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1600, 900), color=(248, 248, 248))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle((40, 40, 1560, 860), outline=(236, 9, 146), width=6)
+    draw.text((90, 90), "HW1 - Captura de Tela", fill=(0, 0, 0))
+    draw.text((90, 150), title, fill=(20, 20, 20))
+    draw.text((90, 220), "Substitua esta imagem por um print real do sistema.", fill=(80, 80, 80))
+    img.save(path, format="PNG")
+    return path
+
+
+def _resolve_screenshot(filename: str, title: str) -> Path:
+    candidates = [
+        ROOT / "docs" / "screenshots" / filename,
+        ROOT / "frontend" / "public" / "screenshots" / filename,
+    ]
+    for item in candidates:
+        if item.exists():
+            return item
+
+    return _placeholder(ROOT / "docs" / "screenshots" / filename, title)
+
+
+def _add_screenshot(doc: Document, caption: str, filename: str) -> None:
+    path = _resolve_screenshot(filename, caption)
+    doc.add_paragraph(caption)
+    pic = doc.add_paragraph()
+    pic.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    pic.add_run().add_picture(str(path), width=Inches(6.7))
+
+
 def main() -> None:
     doc = Document()
+
+    brand = _brand_image_png()
+    if brand:
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p.add_run().add_picture(str(brand), width=Inches(6.2))
 
     add_title(doc, "Manual Completo do Sistema - Gestao de Apoio Arquivistico")
     add_p(doc, "Publico-alvo: Arquivistas, Gestores de Documentos, Classificadores e Auditores.")
@@ -198,8 +270,18 @@ def main() -> None:
         "Emitir relatorios de apoio para controle gerencial.",
     ])
 
-    doc.save(OUT)
-    print(f"Manual gerado em: {OUT}")
+    add_h1(doc, "17. Capturas de Tela")
+    add_p(doc, "Abaixo estao os prints do sistema para apoio de treinamento. Se algum print ainda nao existir, o documento inclui um placeholder visual para substituicao.")
+    _add_screenshot(doc, "Tela de Login", "login.png")
+    _add_screenshot(doc, "Portal do Cliente", "portal.png")
+    _add_screenshot(doc, "Dashboard Administrativo", "dashboard.png")
+    _add_screenshot(doc, "Swagger / Documentacao da API", "api_docs.png")
+
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    saved = _save_with_fallback(doc, OUT)
+    if brand and brand.exists():
+        brand.unlink(missing_ok=True)
+    print(f"Manual gerado em: {saved}")
 
 
 if __name__ == "__main__":
