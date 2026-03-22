@@ -6,7 +6,8 @@
 	migrate migrate-create db-reset test test-cov \
 	load-k6 load-locust security-zap \
 	lint format backend-shell psql redis-cli \
-	oci-up oci-down oci-logs oci-migrate oci-deploy oci-reset-redeploy
+	oci-up oci-down oci-logs oci-migrate oci-deploy oci-reset-redeploy \
+	dev-init dev-up dev-infra dev-status dev-health
 
 help: ## Exibir esta ajuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -15,6 +16,23 @@ help: ## Exibir esta ajuda
 # ---- Docker ----
 up: ## Subir todos os containers (dev)
 	docker compose up -d
+
+dev-init: ## Inicializar ambiente local (cria .env se faltar, sobe stack e aplica migrate)
+	@if [ ! -f .env ]; then cp .env.example .env; echo ".env criado a partir de .env.example"; fi
+	docker compose up -d
+	docker compose exec backend alembic upgrade head
+
+dev-up: ## Subir stack local completa
+	docker compose up -d
+
+dev-infra: ## Subir somente infraestrutura base local
+	docker compose up -d postgres redis minio clamav
+
+dev-status: ## Ver status dos serviços locais
+	docker compose ps
+
+dev-health: ## Validar /health do backend local dentro do container
+	docker compose exec backend python -c "import urllib.request;print(urllib.request.urlopen('http://localhost:8000/health', timeout=5).read().decode())"
 
 down: ## Parar todos os containers
 	docker compose down
