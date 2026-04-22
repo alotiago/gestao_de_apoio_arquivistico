@@ -65,6 +65,10 @@ minio_data/
 *.bak
 *.tmp
 ~$*.docx
+
+# ---- Arquivos locais sensíveis ----
+docs/PROMPTS_DEPLOY.md
+tmp_gmp_hotfix_excel_parser.py
 backend/celerybeat-schedule
 
 # ---- E2E (Playwright) ----
